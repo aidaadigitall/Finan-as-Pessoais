@@ -1,0 +1,7 @@
+{
+  "name": "FinAI - Gestão Inteligente",
+  "description": "Sistema financeiro inteligente com integração WhatsApp e IA Gemini para auditoria e lançamentos automatizados via texto, áudio e imagem.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
