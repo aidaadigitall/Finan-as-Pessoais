@@ -1,7 +1,8 @@
 
 export enum TransactionType {
   INCOME = 'income',
-  EXPENSE = 'expense'
+  EXPENSE = 'expense',
+  TRANSFER = 'transfer'
 }
 
 export enum TransactionStatus {
@@ -25,6 +26,16 @@ export const RecurrenceLabels: Record<RecurrenceFrequency, string> = {
   annual: 'Anual'
 };
 
+export interface BankAccount {
+  id: string;
+  name: string;
+  bankName: string;
+  initialBalance: number;
+  currentBalance: number;
+  color: string;
+  icon: string; // Lucide icon name placeholder
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -44,7 +55,10 @@ export interface Transaction {
   isPaid: boolean; // Status financeiro (Pago/Pendente)
   source: 'whatsapp_ai' | 'manual';
   originalInput?: string;
-  recurrence?: RecurrenceFrequency; // Nova propriedade
+  recurrence?: RecurrenceFrequency;
+  accountId?: string; // Conta de origem/destino principal
+  destinationAccountId?: string; // Para transferências
+  reconciled?: boolean; // Conciliação bancária
 }
 
 export interface ChatMessage {

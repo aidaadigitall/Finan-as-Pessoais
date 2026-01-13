@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
 import { Category, CategoryType } from '../types';
-import { Plus, Trash2, Tag, AlertTriangle, X, Check, Target } from 'lucide-react';
+import { Plus, Trash2, Tag, AlertTriangle, X, Check, Target, Edit2, Save } from 'lucide-react';
 
 interface CategoryManagerProps {
   categories: Category[];
   onAddCategory: (category: Category) => void;
+  onUpdateCategory: (category: Category) => void;
   onDeleteCategory: (id: string) => void;
 }
 
-export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCategory, onDeleteCategory }) => {
+export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCategory, onUpdateCategory, onDeleteCategory }) => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryType, setNewCategoryType] = useState<CategoryType>('expense');
   const [newCategoryBudget, setNewCategoryBudget] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Edit Mode State
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editBudgetInput, setEditBudgetInput] = useState('');
 
   const handleAdd = () => {
     if (!newCategoryName.trim()) return;
@@ -27,6 +32,27 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
     onAddCategory(newCategory);
     setNewCategoryName('');
     setNewCategoryBudget('');
+  };
+
+  const startEdit = (category: Category) => {
+    setEditingCategory(category);
+    setEditBudgetInput(category.budgetLimit?.toString() || '');
+  };
+
+  const saveEdit = () => {
+    if (editingCategory) {
+        onUpdateCategory({
+            ...editingCategory,
+            budgetLimit: editBudgetInput ? parseFloat(editBudgetInput) : undefined
+        });
+        setEditingCategory(null);
+        setEditBudgetInput('');
+    }
+  };
+
+  const cancelEdit = () => {
+      setEditingCategory(null);
+      setEditBudgetInput('');
   };
 
   const confirmDelete = () => {
@@ -53,7 +79,49 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Edit Modal Overlay */}
+      {editingCategory && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95">
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                      <Target size={20} className="text-indigo-600 dark:text-indigo-400" />
+                      Definir Meta Mensal
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      Defina um teto de gastos para a categoria <strong>{editingCategory.name}</strong>. Isso ajudará no monitoramento do seu orçamento no Dashboard.
+                  </p>
+                  
+                  <div className="mb-6">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Valor da Meta (R$)</label>
+                      <input
+                          type="number"
+                          value={editBudgetInput}
+                          onChange={(e) => setEditBudgetInput(e.target.value)}
+                          className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white text-lg font-bold"
+                          placeholder="0.00"
+                          autoFocus
+                      />
+                  </div>
+
+                  <div className="flex gap-3">
+                      <button 
+                          onClick={cancelEdit}
+                          className="flex-1 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                      >
+                          Cancelar
+                      </button>
+                      <button 
+                          onClick={saveEdit}
+                          className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition flex items-center justify-center gap-2"
+                      >
+                          <Save size={18} /> Salvar Meta
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Add New Category Card */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
@@ -85,7 +153,9 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
           </div>
           {(newCategoryType === 'expense' || newCategoryType === 'both') && (
             <div className="animate-in fade-in">
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Teto de Gastos (Opcional)</label>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
+                    <Target size={12} className="text-emerald-500"/> Meta Mensal (Opcional)
+                </label>
                 <div className="relative">
                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">R$</span>
                     <input
@@ -117,22 +187,37 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
         </div>
         <div className="divide-y divide-gray-100 dark:divide-gray-700">
           {categories.map((category) => (
-            <div key={category.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+            <div key={category.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition group">
               <div className="flex items-center gap-3">
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${getBadgeColor(category.type)} dark:bg-opacity-20`}>
                   {getTypeLabel(category.type)}
                 </span>
                 <div className="flex flex-col">
                     <span className="text-gray-800 dark:text-gray-200 font-medium">{category.name}</span>
-                    {category.budgetLimit && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                            <Target size={10} /> Meta: R$ {category.budgetLimit.toFixed(2)}
+                    {category.budgetLimit ? (
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded w-fit mt-0.5">
+                            <Target size={12} /> Meta: R$ {category.budgetLimit.toFixed(2)}
+                        </span>
+                    ) : (category.type === 'expense' || category.type === 'both') && (
+                        <span className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                            Sem meta definida
                         </span>
                     )}
                 </div>
               </div>
               
               <div className="flex items-center gap-2">
+                  {/* Edit Budget Button - Only for Expense/Both types */}
+                  {(category.type === 'expense' || category.type === 'both') && (
+                      <button 
+                         onClick={() => startEdit(category)}
+                         className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition"
+                         title="Editar Meta / Orçamento"
+                      >
+                          <Edit2 size={18} />
+                      </button>
+                  )}
+
                  {deleteConfirmId === category.id ? (
                     <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-lg animate-in fade-in slide-in-from-right-5 duration-200">
                        <span className="text-xs text-red-600 dark:text-red-400 font-medium mr-1">Excluir?</span>
