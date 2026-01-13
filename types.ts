@@ -1,3 +1,4 @@
+
 export enum TransactionType {
   INCOME = 'income',
   EXPENSE = 'expense'
@@ -28,6 +29,7 @@ export interface Category {
   id: string;
   name: string;
   type: CategoryType;
+  budgetLimit?: number; // Teto de gastos mensal
 }
 
 export interface Transaction {

@@ -8,7 +8,7 @@ import { AccountsReceivable } from './components/AccountsReceivable';
 import { WhatsAppIntegration } from './components/WhatsAppIntegration';
 import { analyzeFinancialInput } from './services/geminiService';
 import { Transaction, TransactionType, TransactionStatus, Category, AppNotification, ThemeColor, AIRule, WhatsAppConfig } from './types';
-import { LayoutDashboard, MessageSquare, List, Wallet, Tag, ArrowDownCircle, ArrowUpCircle, Bell, Settings, Moon, Sun, X, Check, Smartphone } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, List, Wallet, Tag, ArrowDownCircle, ArrowUpCircle, Bell, Settings, Moon, Sun, X, Check, Smartphone, User, Palette, Brain, Database, Trash2, LogOut, Save } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'list' | 'payable' | 'receivable' | 'categories' | 'whatsapp'>('dashboard');
@@ -16,7 +16,14 @@ const App: React.FC = () => {
   // Theme State
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [themeColor, setThemeColor] = useState<ThemeColor>('indigo');
+  
+  // Settings Modal State
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'appearance' | 'ai' | 'data'>('profile');
+
+  // User Profile State
+  const [userName, setUserName] = useState('Usuário');
+  const [userPhone, setUserPhone] = useState('');
 
   // Notifications State
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -32,11 +39,11 @@ const App: React.FC = () => {
     instanceId: null
   });
 
-  // Initial Categories
+  // Initial Categories with Budgets
   const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Alimentação', type: 'expense' },
-    { id: '2', name: 'Transporte', type: 'expense' },
-    { id: '3', name: 'Lazer', type: 'expense' },
+    { id: '1', name: 'Alimentação', type: 'expense', budgetLimit: 1200 },
+    { id: '2', name: 'Transporte', type: 'expense', budgetLimit: 500 },
+    { id: '3', name: 'Lazer', type: 'expense', budgetLimit: 300 },
     { id: '4', name: 'Contas Fixas', type: 'expense' },
     { id: '5', name: 'Salário', type: 'income' },
     { id: '6', name: 'Investimentos', type: 'both' },
@@ -154,13 +161,26 @@ const App: React.FC = () => {
       setAiRules(prev => [...prev, rule]);
   };
 
+  const handleDeleteAiRule = (index: number) => {
+      setAiRules(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleResetData = () => {
+      if (confirm("Tem certeza? Isso apagará todas as transações, regras e configurações locais.")) {
+          setTransactions([]);
+          setAiRules([]);
+          setNotifications([]);
+          alert("Dados resetados com sucesso.");
+      }
+  };
+
   // WhatsApp Connect Mock
   const handleConnectWhatsApp = () => {
     // In a real SaaS, this would call an API to generate a QR code from backend
     setTimeout(() => {
         setWhatsAppConfig({
             status: 'connected',
-            phoneNumber: '+55 11 99999-9999',
+            phoneNumber: userPhone || '+55 11 99999-9999',
             instanceId: 'inst_12345'
         });
     }, 1500);
@@ -259,7 +279,7 @@ const App: React.FC = () => {
               <span className="ml-3 hidden md:block">{isDarkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
            </button>
            <button 
-              onClick={() => setShowSettings(true)}
+              onClick={() => { setShowSettings(true); setSettingsTab('profile'); }}
               className="w-full flex items-center justify-center md:justify-start px-3 py-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
            >
               <Settings size={20} />
@@ -324,14 +344,14 @@ const App: React.FC = () => {
              </div>
 
              <div className={`hidden md:flex w-10 h-10 rounded-full bg-${themeColor}-100 dark:bg-${themeColor}-900/30 text-${themeColor}-600 dark:text-${themeColor}-400 items-center justify-center font-bold`}>
-               US
+               {userName.substring(0, 2).toUpperCase()}
              </div>
           </div>
         </header>
 
         <div className="max-w-7xl mx-auto">
           {activeTab === 'dashboard' && (
-            <Dashboard transactions={transactions} themeColor={themeColor} />
+            <Dashboard transactions={transactions} themeColor={themeColor} categories={categories} />
           )}
 
           {activeTab === 'chat' && (
@@ -368,6 +388,7 @@ const App: React.FC = () => {
                     userRules={aiRules}
                     onAddRule={handleAddAiRule}
                     themeColor={themeColor}
+                    transactions={transactions}
                   />
                 </div>
              </div>
@@ -378,6 +399,7 @@ const App: React.FC = () => {
               transactions={transactions} 
               categories={categories}
               onUpdateTransaction={handleUpdateTransaction}
+              onToggleStatus={handleToggleStatus}
             />
           )}
 
@@ -409,54 +431,192 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Settings Modal */}
+      {/* Settings Modal - COMPLETE */}
       {showSettings && (
          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white">Aparência e Configurações</h2>
-                    <button onClick={() => setShowSettings(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+                
+                {/* Sidebar */}
+                <div className="w-full md:w-1/3 bg-gray-50 dark:bg-gray-900 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 p-4">
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-6 pl-2 hidden md:block">Configurações</h2>
+                    <nav className="flex md:flex-col gap-2 overflow-x-auto md:overflow-visible no-scrollbar">
+                        {[
+                            { id: 'profile', icon: User, label: 'Perfil' },
+                            { id: 'appearance', icon: Palette, label: 'Aparência' },
+                            { id: 'ai', icon: Brain, label: 'Inteligência' },
+                            { id: 'data', icon: Database, label: 'Dados' }
+                        ].map(item => (
+                            <button
+                                key={item.id}
+                                onClick={() => setSettingsTab(item.id as any)}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                                    settingsTab === item.id 
+                                    ? `bg-white dark:bg-gray-800 text-${themeColor}-600 dark:text-${themeColor}-400 shadow-sm ring-1 ring-gray-200 dark:ring-gray-700` 
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
+                                }`}
+                            >
+                                <item.icon size={18} />
+                                {item.label}
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+
+                {/* Content Area */}
+                <div className="flex-1 p-6 overflow-y-auto relative">
+                    <button 
+                        onClick={() => setShowSettings(false)} 
+                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    >
                         <X size={24} />
                     </button>
+
+                    {settingsTab === 'profile' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
+                            <h3 className="text-xl font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-2">Perfil do Usuário</h3>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome de Exibição</label>
+                                <input 
+                                    type="text" 
+                                    value={userName}
+                                    onChange={(e) => setUserName(e.target.value)}
+                                    className="w-full p-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Telefone (WhatsApp)</label>
+                                <input 
+                                    type="text" 
+                                    value={userPhone}
+                                    onChange={(e) => setUserPhone(e.target.value)}
+                                    placeholder="+55 11 99999-9999"
+                                    className="w-full p-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Utilizado para identificar suas mensagens na integração.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {settingsTab === 'appearance' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
+                             <h3 className="text-xl font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-2">Aparência</h3>
+                             
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Cor do Tema</label>
+                                <div className="flex gap-3 flex-wrap">
+                                    {[
+                                        { name: 'indigo', hex: 'bg-indigo-600' },
+                                        { name: 'blue', hex: 'bg-blue-600' },
+                                        { name: 'emerald', hex: 'bg-emerald-600' },
+                                        { name: 'violet', hex: 'bg-violet-600' },
+                                        { name: 'rose', hex: 'bg-rose-600' },
+                                    ].map((color) => (
+                                        <button
+                                            key={color.name}
+                                            onClick={() => setThemeColor(color.name as ThemeColor)}
+                                            className={`w-10 h-10 rounded-full ${color.hex} flex items-center justify-center transition-transform hover:scale-110 ring-2 ring-offset-2 dark:ring-offset-gray-800 ${themeColor === color.name ? 'ring-gray-400' : 'ring-transparent'}`}
+                                        >
+                                            {themeColor === color.name && <Check size={16} className="text-white" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Modo Escuro</label>
+                                <button 
+                                    onClick={() => setIsDarkMode(!isDarkMode)}
+                                    className={`flex items-center justify-between w-full p-3 rounded-lg border ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'} transition-all`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {isDarkMode ? <Moon size={20} className="text-indigo-400" /> : <Sun size={20} className="text-orange-500" />}
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                            {isDarkMode ? 'Ativado' : 'Desativado'}
+                                        </span>
+                                    </div>
+                                    <div className={`w-10 h-5 rounded-full relative transition-colors ${isDarkMode ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isDarkMode ? 'left-6' : 'left-1'}`}></div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {settingsTab === 'ai' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-2 h-full flex flex-col">
+                             <h3 className="text-xl font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-2 flex items-center gap-2">
+                                <Brain size={20} className={`text-${themeColor}-600`} /> 
+                                Regras de Aprendizado
+                             </h3>
+                             <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Estas são as regras criadas automaticamente quando você corrige a IA. Exclua uma regra se ela estiver incorreta.
+                             </p>
+
+                             <div className="flex-1 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50 p-2">
+                                {aiRules.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                        <Brain size={48} className="mb-2 opacity-20" />
+                                        <p className="text-sm">Nenhuma regra aprendida ainda.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {aiRules.map((rule, index) => (
+                                            <div key={index} className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded shadow-sm border border-gray-100 dark:border-gray-700">
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <span className="text-gray-500 dark:text-gray-400">Se contiver:</span>
+                                                    <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1.5 rounded text-gray-800 dark:text-gray-200">"{rule.keyword}"</span>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 dark:bg-${themeColor}-900/30 dark:text-${themeColor}-400`}>
+                                                        {rule.category}
+                                                    </span>
+                                                </div>
+                                                <button 
+                                                    onClick={() => handleDeleteAiRule(index)}
+                                                    className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                                                    title="Excluir regra"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                             </div>
+                        </div>
+                    )}
+
+                    {settingsTab === 'data' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
+                            <h3 className="text-xl font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-2">Gestão de Dados</h3>
+                            
+                            <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg p-4">
+                                <h4 className="text-red-800 dark:text-red-400 font-bold text-sm mb-2 flex items-center gap-2">
+                                    <LogOut size={16} /> Zona de Perigo
+                                </h4>
+                                <p className="text-xs text-red-600 dark:text-red-300 mb-4">
+                                    Esta ação apagará todas as transações, configurações e regras de aprendizado armazenadas neste dispositivo.
+                                </p>
+                                <button 
+                                    onClick={handleResetData}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition"
+                                >
+                                    Resetar Todos os Dados
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                <div className="space-y-6">
-                    {/* Theme Color Selector */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Cor Principal</label>
-                        <div className="flex gap-4">
-                            {[
-                                { name: 'indigo', hex: 'bg-indigo-600' },
-                                { name: 'blue', hex: 'bg-blue-600' },
-                                { name: 'emerald', hex: 'bg-emerald-600' },
-                                { name: 'violet', hex: 'bg-violet-600' },
-                                { name: 'rose', hex: 'bg-rose-600' },
-                            ].map((color) => (
-                                <button
-                                    key={color.name}
-                                    onClick={() => setThemeColor(color.name as ThemeColor)}
-                                    className={`w-10 h-10 rounded-full ${color.hex} flex items-center justify-center transition-transform hover:scale-110 ring-2 ring-offset-2 dark:ring-offset-gray-800 ${themeColor === color.name ? 'ring-gray-400' : 'ring-transparent'}`}
-                                >
-                                    {themeColor === color.name && <Check size={16} className="text-white" />}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="border-t border-gray-100 dark:border-gray-700 pt-6">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            A IA aprenderá automaticamente com suas correções no chat. 
-                            Atualmente existem <strong>{aiRules.length}</strong> regras personalizadas aprendidas.
-                        </p>
-                    </div>
-
+                {/* Footer Buttons (Mobile Only usually, but here persistent) */}
+                <div className="p-6 pt-0 mt-auto md:hidden">
                     <button 
                         onClick={() => setShowSettings(false)}
-                        className={`w-full py-2.5 rounded-lg text-white font-medium bg-${themeColor}-600 hover:bg-${themeColor}-700 transition`}
+                        className={`w-full py-2.5 rounded-lg text-white font-medium bg-${themeColor}-600 hover:bg-${themeColor}-700 transition flex items-center justify-center gap-2`}
                     >
-                        Salvar Alterações
+                        <Save size={18} /> Fechar
                     </button>
                 </div>
+
             </div>
          </div>
       )}

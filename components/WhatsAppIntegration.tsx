@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { QrCode, Smartphone, Wifi, WifiOff, MessageSquare, Send, Loader2, CheckCircle2, AlertCircle, Server, Key, Globe, Copy } from 'lucide-react';
+import { QrCode, Smartphone, Wifi, WifiOff, MessageSquare, Send, Loader2, CheckCircle2, AlertCircle, Server, Key, Globe, Copy, ExternalLink, Save } from 'lucide-react';
 import { WhatsAppConfig, ThemeColor } from '../types';
 
 interface WhatsAppIntegrationProps {
@@ -25,6 +25,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
   const [gatewayUrl, setGatewayUrl] = useState('https://api.seusaas.com/evolution');
   const [apiKey, setApiKey] = useState('sk_live_...');
   const [webhookUrl, setWebhookUrl] = useState('https://app.finai.com/api/webhook/whatsapp');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSimulate = async () => {
     if (!simulationText.trim()) return;
@@ -35,7 +36,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
       await onSimulateMessage(simulationText);
       setSimulationStatus('success');
       setSimulationText('');
-      setTimeout(() => setSimulationStatus('idle'), 3000);
+      setTimeout(() => setSimulationStatus('idle'), 4000);
     } catch (error) {
       setSimulationStatus('error');
     } finally {
@@ -43,9 +44,18 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     }
   };
 
+  const handleSaveConfig = () => {
+    setIsSaving(true);
+    // Simulate API call to save config
+    setTimeout(() => {
+        setIsSaving(false);
+        alert("Configurações do Gateway salvas com sucesso!");
+    }, 1000);
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert('Copiado!');
+    // Could add a toast here in a full implementation
   };
 
   const getThemeText = () => `text-${themeColor}-600`;
@@ -115,69 +125,87 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
         </div>
 
         {/* Configuration Card (SaaS Style) */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-              <Server className={getThemeText()} size={20} />
-              Configuração do Gateway
-           </h3>
-           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              Configure os dados da sua instância do <strong>Evolution API</strong> ou outro gateway compatível.
-           </p>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col h-full">
+           <div>
+               <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                  <Server className={getThemeText()} size={20} />
+                  Configuração do Gateway
+               </h3>
+               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                  Configure os dados da sua instância do <strong>Evolution API</strong> ou outro gateway compatível.
+               </p>
 
-           <div className="space-y-4">
-              <div>
-                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                    <Globe size={12} /> URL do Gateway API
-                 </label>
-                 <input 
-                    type="text" 
-                    value={gatewayUrl}
-                    onChange={(e) => setGatewayUrl(e.target.value)}
-                    className="w-full p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                 />
-              </div>
+               <div className="space-y-4">
+                  <div>
+                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                        <Globe size={12} /> URL do Gateway API
+                     </label>
+                     <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            value={gatewayUrl}
+                            onChange={(e) => setGatewayUrl(e.target.value)}
+                            className="flex-1 p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <a 
+                            href={gatewayUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 transition"
+                            title="Abrir URL do Gateway"
+                        >
+                            <ExternalLink size={18} />
+                        </a>
+                     </div>
+                  </div>
 
-              <div>
-                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                    <Key size={12} /> API Key (Global)
-                 </label>
-                 <input 
-                    type="password" 
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                 />
-              </div>
+                  <div>
+                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                        <Key size={12} /> API Key (Global)
+                     </label>
+                     <input 
+                        type="password" 
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        className="w-full p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                     />
+                  </div>
 
-              <div className="pt-2">
-                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                    Webhook de Retorno (Configure no seu Gateway)
-                 </label>
-                 <div className="flex gap-2">
-                    <input 
-                        readOnly
-                        type="text" 
-                        value={webhookUrl}
-                        className="flex-1 p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-900 text-gray-500 cursor-not-allowed"
-                    />
-                    <button 
-                        onClick={() => copyToClipboard(webhookUrl)}
-                        className="p-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 transition"
-                    >
-                        <Copy size={18} />
-                    </button>
-                 </div>
-                 <p className="text-[10px] text-gray-400 mt-1">
-                    Este é o endpoint que o Evolution API deve chamar quando receber uma mensagem.
-                 </p>
-              </div>
+                  <div className="pt-2">
+                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                        Webhook de Retorno
+                     </label>
+                     <div className="flex gap-2">
+                        <input 
+                            readOnly
+                            type="text" 
+                            value={webhookUrl}
+                            className="flex-1 p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-900 text-gray-500 cursor-not-allowed"
+                        />
+                        <button 
+                            onClick={() => copyToClipboard(webhookUrl)}
+                            className="p-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 transition"
+                            title="Copiar URL do Webhook"
+                        >
+                            <Copy size={18} />
+                        </button>
+                     </div>
+                     <p className="text-[10px] text-gray-400 mt-1">
+                        Configure este endpoint no seu Gateway para receber eventos.
+                     </p>
+                  </div>
+               </div>
            </div>
 
-           <div className="mt-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-lg flex gap-3">
-              <AlertCircle size={20} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-blue-800 dark:text-blue-300">
-                 <strong>Dica de Arquiteto:</strong> Para produção real, utilize o <a href="#" className="underline">Evolution API</a> com Docker. É a solução Open Source mais estável para transformar WhatsApp em API REST.
-              </div>
+           <div className="mt-auto pt-6">
+               <button 
+                  onClick={handleSaveConfig}
+                  disabled={isSaving}
+                  className={`w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white py-2.5 rounded-lg transition-all ${isSaving ? 'opacity-75 cursor-wait' : ''}`}
+               >
+                   {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                   {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+               </button>
            </div>
         </div>
       </div>
@@ -209,24 +237,46 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                       disabled={config.status === 'disconnected'}
                     />
                 </div>
-                <div className="flex justify-between items-center mt-3">
-                    <div className="text-sm">
-                       {simulationStatus === 'success' && (
-                         <span className="text-green-600 flex items-center gap-1 animate-in fade-in"><CheckCircle2 size={16} /> Webhook processado com sucesso!</span>
-                       )}
-                       {simulationStatus === 'error' && (
-                         <span className="text-red-600 flex items-center gap-1 animate-in fade-in"><AlertCircle size={16} /> Falha no processamento.</span>
-                       )}
-                    </div>
-                    <button
-                      onClick={handleSimulate}
-                      disabled={isSimulating || !simulationText.trim() || config.status === 'disconnected'}
-                      className={`${getThemeBg()} text-white px-5 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2 shadow-md`}
-                    >
-                      {isSimulating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                      Disparar Evento
-                    </button>
-                 </div>
+                
+                {/* Visual Status Feedback */}
+                <div className="mt-4 min-h-[50px]">
+                    {simulationStatus === 'success' && (
+                        <div className="flex items-center gap-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 text-green-700 dark:text-green-300 p-3 rounded-lg animate-in fade-in slide-in-from-top-2">
+                            <div className="bg-green-100 dark:bg-green-800 p-1 rounded-full">
+                                <CheckCircle2 size={18} />
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-medium text-sm">Webhook processado com sucesso!</p>
+                                <p className="text-xs opacity-90">A transação foi identificada e adicionada ao diário.</p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {simulationStatus === 'error' && (
+                         <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-700 dark:text-red-300 p-3 rounded-lg animate-in fade-in slide-in-from-top-2">
+                            <div className="bg-red-100 dark:bg-red-800 p-1 rounded-full">
+                                <AlertCircle size={18} />
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-medium text-sm">Falha no processamento.</p>
+                                <p className="text-xs opacity-90">Verifique a conexão ou tente novamente.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {simulationStatus === 'idle' && (
+                        <div className="flex justify-end">
+                            <button
+                            onClick={handleSimulate}
+                            disabled={isSimulating || !simulationText.trim() || config.status === 'disconnected'}
+                            className={`${getThemeBg()} text-white px-5 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2 shadow-md`}
+                            >
+                            {isSimulating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                            Disparar Evento
+                            </button>
+                        </div>
+                    )}
+                </div>
              </div>
 
              <div className="w-full md:w-1/3 bg-gray-900 rounded-xl p-4 text-xs font-mono text-gray-300 overflow-hidden relative">

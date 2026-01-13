@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Transaction, TransactionType, Category, RecurrenceFrequency, RecurrenceLabels } from '../types';
-import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info } from 'lucide-react';
 
 interface TransactionListProps {
   transactions: Transaction[];
   categories: Category[]; 
-  onUpdateTransaction: (transaction: Transaction) => void; 
+  onUpdateTransaction: (transaction: Transaction) => void;
+  onToggleStatus: (id: string) => void;
 }
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, onUpdateTransaction }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, onUpdateTransaction, onToggleStatus }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -16,6 +17,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
+  
+  // Expand details state
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   // 1. Sort by date desc
   const sorted = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -73,6 +77,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const startEdit = (t: Transaction) => {
     setEditingId(t.id);
     setEditForm({ ...t, recurrence: t.recurrence || 'none' });
+    setExpandedRowId(null); // Close details if editing
   };
 
   const cancelEdit = () => {
@@ -93,6 +98,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const handleEditChange = (field: keyof Transaction, value: any) => {
       setEditForm(prev => ({ ...prev, [field]: value }));
   };
+  
+  const toggleDetails = (id: string) => {
+      setExpandedRowId(prev => prev === id ? null : id);
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -168,9 +177,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           <tbody>
             {filteredTransactions.map((t) => {
               const isEditing = editingId === t.id;
+              const isExpanded = expandedRowId === t.id;
 
               return (
-                <tr key={t.id} className={`border-b border-gray-50 dark:border-gray-700 transition-colors ${isEditing ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                <React.Fragment key={t.id}>
+                <tr className={`border-b border-gray-50 dark:border-gray-700 transition-colors ${isEditing || isExpanded ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
                   {/* Date Column */}
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                     {isEditing ? (
@@ -304,16 +315,73 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                            </button>
                         </div>
                      ) : (
-                        <button 
-                           onClick={() => startEdit(t)}
-                           className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition"
-                           title="Editar"
-                        >
-                           <Edit2 size={16} />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                           <button 
+                              onClick={() => toggleDetails(t.id)}
+                              className={`p-2 rounded-full transition ${isExpanded ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`}
+                              title="Mais Detalhes"
+                           >
+                               <Eye size={16} />
+                           </button>
+                           <button 
+                              onClick={() => onToggleStatus(t.id)}
+                              className={`p-2 rounded-full transition ${t.isPaid ? 'text-green-600 bg-green-50 dark:bg-green-900/20' : 'text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'}`}
+                              title={t.isPaid ? "Marcar como Pendente" : "Marcar como Pago"}
+                           >
+                              <CheckCircle2 size={16} />
+                           </button>
+                           <button 
+                              onClick={() => startEdit(t)}
+                              className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition"
+                              title="Editar"
+                           >
+                              <Edit2 size={16} />
+                           </button>
+                        </div>
                      )}
                   </td>
                 </tr>
+                {/* Expandable Details Row */}
+                {isExpanded && (
+                    <tr className="bg-gray-50 dark:bg-gray-700/30 animate-in fade-in slide-in-from-top-2">
+                        <td colSpan={7} className="px-6 py-4">
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                 <div>
+                                     <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase mb-1">Fonte do Lançamento</p>
+                                     <p className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                         {t.source === 'whatsapp_ai' ? '🤖 Inteligência Artificial (Chat)' : '👤 Manual'}
+                                     </p>
+                                 </div>
+                                 
+                                 <div>
+                                     <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase mb-1">Datas</p>
+                                     <div className="space-y-1">
+                                        <p className="text-gray-700 dark:text-gray-300">
+                                            <span className="text-gray-500">Competência:</span> {new Date(t.date).toLocaleString()}
+                                        </p>
+                                        {t.dueDate && (
+                                            <p className="text-gray-700 dark:text-gray-300">
+                                                <span className="text-gray-500">Vencimento:</span> {new Date(t.dueDate).toLocaleDateString()}
+                                            </p>
+                                        )}
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase mb-1">Dados Originais</p>
+                                      {t.originalInput ? (
+                                          <p className="text-gray-600 dark:text-gray-300 italic bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-600">
+                                              "{t.originalInput}"
+                                          </p>
+                                      ) : (
+                                          <span className="text-gray-400">Não disponível</span>
+                                      )}
+                                 </div>
+                             </div>
+                        </td>
+                    </tr>
+                )}
+                </React.Fragment>
               );
             })}
             {filteredTransactions.length === 0 && (
