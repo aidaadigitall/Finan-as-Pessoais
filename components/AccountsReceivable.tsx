@@ -1,13 +1,14 @@
 import React from 'react';
 import { Transaction, TransactionType } from '../types';
-import { Calendar, CheckCircle, TrendingUp, Wallet, ArrowDown } from 'lucide-react';
+import { Calendar, CheckCircle, TrendingUp, Wallet, ArrowDown, Plus } from 'lucide-react';
 
 interface AccountsReceivableProps {
   transactions: Transaction[];
   onToggleStatus: (id: string) => void;
+  onOpenTransactionModal: () => void;
 }
 
-export const AccountsReceivable: React.FC<AccountsReceivableProps> = ({ transactions, onToggleStatus }) => {
+export const AccountsReceivable: React.FC<AccountsReceivableProps> = ({ transactions, onToggleStatus, onOpenTransactionModal }) => {
   // Filter for Income that are NOT paid (received)
   const receivables = transactions
     .filter(t => t.type === TransactionType.INCOME && !t.isPaid)
@@ -35,10 +36,12 @@ export const AccountsReceivable: React.FC<AccountsReceivableProps> = ({ transact
              <Wallet className="absolute right-[-10px] bottom-[-20px] opacity-10" size={140} />
             
              <div className="relative z-10 mt-4 md:mt-0 flex gap-4">
-                 <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 text-center min-w-[100px]">
-                      <span className="block text-2xl font-bold">{receivables.length}</span>
-                      <span className="text-xs text-emerald-100">Recebimentos</span>
-                 </div>
+                 <button 
+                    onClick={onOpenTransactionModal}
+                    className="bg-white text-emerald-600 px-4 py-3 rounded-xl font-bold hover:bg-gray-100 transition shadow-lg flex items-center gap-2"
+                 >
+                    <Plus size={18} /> Nova Receita
+                 </button>
             </div>
        </div>
 

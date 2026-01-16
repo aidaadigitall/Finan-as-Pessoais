@@ -1,13 +1,14 @@
 import React from 'react';
 import { Transaction, TransactionType } from '../types';
-import { Calendar, AlertCircle, CheckCircle, TrendingDown, ArrowRight } from 'lucide-react';
+import { Calendar, AlertCircle, CheckCircle, TrendingDown, ArrowRight, Plus } from 'lucide-react';
 
 interface AccountsPayableProps {
   transactions: Transaction[];
   onToggleStatus: (id: string) => void;
+  onOpenTransactionModal: () => void;
 }
 
-export const AccountsPayable: React.FC<AccountsPayableProps> = ({ transactions, onToggleStatus }) => {
+export const AccountsPayable: React.FC<AccountsPayableProps> = ({ transactions, onToggleStatus, onOpenTransactionModal }) => {
   // Filter for Expenses that are NOT paid
   const payables = transactions
     .filter(t => t.type === TransactionType.EXPENSE && !t.isPaid)
@@ -36,10 +37,12 @@ export const AccountsPayable: React.FC<AccountsPayableProps> = ({ transactions, 
             <AlertCircle className="absolute right-[-10px] bottom-[-20px] opacity-10" size={140} />
             
             <div className="relative z-10 mt-4 md:mt-0 flex gap-4">
-                 <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 text-center min-w-[100px]">
-                      <span className="block text-2xl font-bold">{payables.length}</span>
-                      <span className="text-xs text-red-100">Contas</span>
-                 </div>
+                 <button 
+                    onClick={onOpenTransactionModal}
+                    className="bg-white text-red-600 px-4 py-3 rounded-xl font-bold hover:bg-gray-100 transition shadow-lg flex items-center gap-2"
+                 >
+                    <Plus size={18} /> Nova Despesa
+                 </button>
             </div>
        </div>
 

@@ -15,6 +15,9 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
   const [newCategoryBudget, setNewCategoryBudget] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Bulk Selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // Edit Mode State
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editBudgetInput, setEditBudgetInput] = useState('');
@@ -60,6 +63,22 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
       onDeleteCategory(deleteConfirmId);
       setDeleteConfirmId(null);
     }
+  };
+  
+  const toggleSelection = (id: string) => {
+      setSelectedIds(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(id)) newSet.delete(id);
+          else newSet.add(id);
+          return newSet;
+      });
+  };
+
+  const handleBulkDelete = () => {
+      if (confirm(`Tem certeza que deseja excluir ${selectedIds.size} categorias?`)) {
+          selectedIds.forEach(id => onDeleteCategory(id));
+          setSelectedIds(new Set());
+      }
   };
 
   const getBadgeColor = (type: CategoryType) => {
@@ -182,13 +201,27 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
 
       {/* Categories List */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
+        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
           <h3 className="font-semibold text-gray-700 dark:text-gray-200">Categorias Existentes</h3>
+          {selectedIds.size > 0 && (
+              <button 
+                  onClick={handleBulkDelete}
+                  className="px-3 py-1.5 bg-red-100 text-red-600 rounded-lg text-sm font-bold hover:bg-red-200 transition flex items-center gap-2"
+              >
+                  <Trash2 size={14} /> Excluir ({selectedIds.size})
+              </button>
+          )}
         </div>
         <div className="divide-y divide-gray-100 dark:divide-gray-700">
           {categories.map((category) => (
             <div key={category.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition group">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
+                <input 
+                    type="checkbox" 
+                    checked={selectedIds.has(category.id)}
+                    onChange={() => toggleSelection(category.id)}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${getBadgeColor(category.type)} dark:bg-opacity-20`}>
                   {getTypeLabel(category.type)}
                 </span>

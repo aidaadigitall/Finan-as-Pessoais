@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Transaction, TransactionType, Category, RecurrenceFrequency, RecurrenceLabels, BankAccount } from '../types';
-import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText } from 'lucide-react';
+import { exportToPDF, exportToExcel } from '../services/exportService';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -44,33 +45,16 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     return matchesSearch && matchesDate;
   });
 
-  // Export CSV Logic
-  const handleExportCSV = () => {
-    const headers = ['ID', 'Data', 'Descrição', 'Categoria', 'Conta', 'Tipo', 'Valor', 'Status'];
-    const rows = filteredTransactions.map(t => [
-      t.id,
-      new Date(t.date).toLocaleDateString('pt-BR'),
-      `"${t.description}"`,
-      t.category,
-      accounts.find(a => a.id === t.accountId)?.name || '-',
-      t.type,
-      (t.amount || 0).toFixed(2),
-      t.isPaid ? 'Pago' : 'Pendente'
-    ]);
+  // Export CSV/Excel/PDF Handlers
+  const handleExportPDF = () => {
+      exportToPDF(filteredTransactions, accounts, { 
+          fileName: `extrato_finai_${new Date().toISOString().slice(0,10)}.pdf`,
+          companyName: 'Minha Empresa SaaS' 
+      });
+  };
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => r.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `lancamentos_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleExportExcel = () => {
+      exportToExcel(filteredTransactions, accounts, `extrato_finai_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
   // Edit Logic
@@ -114,12 +98,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Lançamentos Diários</h3>
-           <button 
-              onClick={handleExportCSV}
-              className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-2 rounded-lg transition"
-            >
-              <Download size={16} /> Exportar CSV
-           </button>
+           <div className="flex gap-2">
+                <button 
+                    onClick={handleExportPDF}
+                    className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 px-3 py-2 rounded-lg transition"
+                >
+                    <FileText size={16} /> PDF
+                </button>
+                <button 
+                    onClick={handleExportExcel}
+                    className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 px-3 py-2 rounded-lg transition"
+                >
+                    <FileSpreadsheet size={16} /> Excel
+                </button>
+           </div>
         </div>
         
         <div className="flex flex-col md:flex-row gap-3">

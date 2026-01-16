@@ -300,8 +300,8 @@ const App: React.FC = () => {
               <ChatInterface onAddTransaction={handleAddTransaction} categories={categories} userRules={aiRules} onAddRule={handleAddAiRule} themeColor={themeColor} transactions={transactions} />
             )}
             {activeTab === 'list' && <TransactionList transactions={transactions} categories={categories} accounts={bankAccounts} onUpdateTransaction={handleUpdateTransaction} onToggleStatus={handleToggleStatus} />}
-            {activeTab === 'payable' && <AccountsPayable transactions={transactions} onToggleStatus={handleToggleStatus} />}
-            {activeTab === 'receivable' && <AccountsReceivable transactions={transactions} onToggleStatus={handleToggleStatus} />}
+            {activeTab === 'payable' && <AccountsPayable transactions={transactions} onToggleStatus={handleToggleStatus} onOpenTransactionModal={() => setShowTransactionModal(true)} />}
+            {activeTab === 'receivable' && <AccountsReceivable transactions={transactions} onToggleStatus={handleToggleStatus} onOpenTransactionModal={() => setShowTransactionModal(true)} />}
             {activeTab === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />}
             {activeTab === 'whatsapp' && <WhatsAppIntegration config={whatsAppConfig} onConnect={handleConnectWhatsApp} onDisconnect={handleDisconnectWhatsApp} onSimulateMessage={handleWhatsAppSimulation} themeColor={themeColor} />}
             {activeTab === 'settings' && (

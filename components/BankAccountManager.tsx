@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BankAccount, Transaction, TransactionType } from '../types';
-import { Landmark, Plus, CreditCard, Wallet, MoreVertical, Trash2, Edit2, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
+import { Landmark, Plus, CreditCard, Wallet, MoreVertical, Trash2, Edit2, TrendingUp, TrendingDown, CheckCircle2, FileText, Upload, RefreshCw, X } from 'lucide-react';
 
 interface BankAccountManagerProps {
   accounts: BankAccount[];
@@ -18,7 +18,15 @@ export const BankAccountManager: React.FC<BankAccountManagerProps> = ({
   onDeleteAccount 
 }) => {
   const [showModal, setShowModal] = useState(false);
+  const [showReconcileModal, setShowReconcileModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Reconcile State
+  const [reconcileAccount, setReconcileAccount] = useState<BankAccount | null>(null);
+  const [reconcileFile, setReconcileFile] = useState<File | null>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [reconcileStep, setReconcileStep] = useState<1 | 2>(1);
+  const [reconcileMatches, setReconcileMatches] = useState<any[]>([]);
   
   // Form State
   const [name, setName] = useState('');
@@ -70,12 +78,37 @@ export const BankAccountManager: React.FC<BankAccountManagerProps> = ({
          (t.accountId === accountId || t.destinationAccountId === accountId) && t.isPaid
      );
      
-     // Note: Real balance calculation is complex and usually done in backend or App.tsx reducer.
-     // This is for display of recent activity logic
      const reconciledCount = accTransactions.filter(t => t.reconciled).length;
      const pendingCount = accTransactions.filter(t => !t.reconciled).length;
      
      return { reconciledCount, pendingCount };
+  };
+
+  // --- Reconciliation Logic ---
+  const startReconciliation = (account: BankAccount) => {
+      setReconcileAccount(account);
+      setReconcileStep(1);
+      setReconcileFile(null);
+      setShowReconcileModal(true);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files?.[0]) {
+          setReconcileFile(e.target.files[0]);
+          setIsProcessingFile(true);
+          
+          // Simulate Processing
+          setTimeout(() => {
+              setIsProcessingFile(false);
+              setReconcileStep(2);
+              // Mock Matches
+              setReconcileMatches([
+                  { id: 1, date: '2023-10-25', desc: 'SUPERMERCADO', amount: -150.00, status: 'match', systemDesc: 'Compras Mercado' },
+                  { id: 2, date: '2023-10-26', desc: 'POSTO GASOLINA', amount: -200.00, status: 'missing', systemDesc: null },
+                  { id: 3, date: '2023-10-27', desc: 'PIX RECEBIDO', amount: 500.00, status: 'match', systemDesc: 'Pagamento Cliente A' },
+              ]);
+          }, 2000);
+      }
   };
 
   const colors = [
@@ -139,15 +172,17 @@ export const BankAccountManager: React.FC<BankAccountManagerProps> = ({
                            </p>
                        </div>
 
-                       <div className="flex items-center gap-4 text-xs border-t border-gray-100 dark:border-gray-700 pt-4">
-                           <div className="flex items-center gap-1 text-green-600 dark:text-green-400" title="Transações Conciliadas">
-                               <CheckCircle2 size={14} />
-                               <span>{stats.reconciledCount} Conciliados</span>
-                           </div>
+                       <div className="flex items-center justify-between text-xs border-t border-gray-100 dark:border-gray-700 pt-4">
                            <div className="flex items-center gap-1 text-orange-500" title="Transações Pendentes de Conciliação">
                                <CheckCircle2 size={14} className="opacity-50" />
                                <span>{stats.pendingCount} Pendentes</span>
                            </div>
+                           <button 
+                                onClick={() => startReconciliation(account)}
+                                className="text-indigo-600 font-bold hover:underline flex items-center gap-1"
+                           >
+                               <RefreshCw size={12} /> Conciliar
+                           </button>
                        </div>
                    </div>
                </div>
@@ -166,7 +201,7 @@ export const BankAccountManager: React.FC<BankAccountManagerProps> = ({
            </button>
        </div>
 
-       {/* Modal */}
+       {/* Edit Modal */}
        {showModal && (
            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95">
@@ -208,6 +243,110 @@ export const BankAccountManager: React.FC<BankAccountManagerProps> = ({
                        <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition">Cancelar</button>
                        <button onClick={handleSave} className="flex-1 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition">Salvar</button>
                    </div>
+               </div>
+           </div>
+       )}
+
+       {/* Reconciliation Modal */}
+       {showReconcileModal && reconcileAccount && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+               <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl p-6 shadow-2xl animate-in zoom-in-95 overflow-hidden flex flex-col max-h-[90vh]">
+                   <div className="flex justify-between items-center mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
+                       <div>
+                           <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                               <RefreshCw className="text-indigo-500" /> Conciliação Bancária
+                           </h3>
+                           <p className="text-sm text-gray-500">Conta: <strong>{reconcileAccount.name}</strong></p>
+                       </div>
+                       <button onClick={() => setShowReconcileModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+                   </div>
+
+                   <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+                       {reconcileStep === 1 && (
+                           <div className="text-center py-10 space-y-6">
+                               <div className="mx-auto w-20 h-20 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center text-indigo-500">
+                                   <Upload size={32} />
+                               </div>
+                               <div>
+                                   <p className="font-medium text-gray-800 dark:text-white mb-2">Importar Extrato Bancário</p>
+                                   <p className="text-sm text-gray-500 mb-6">Suporta arquivos .OFX, .PDF, .CSV ou .XLSX</p>
+                                   
+                                   {isProcessingFile ? (
+                                       <div className="flex flex-col items-center gap-2 text-indigo-600">
+                                           <RefreshCw size={24} className="animate-spin" />
+                                           <span className="text-sm font-medium">Processando arquivo...</span>
+                                       </div>
+                                   ) : (
+                                       <label className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition inline-flex items-center gap-2">
+                                           <input type="file" className="hidden" accept=".ofx,.csv,.pdf,.xlsx" onChange={handleFileUpload} />
+                                           Selecionar Arquivo
+                                       </label>
+                                   )}
+                               </div>
+                           </div>
+                       )}
+
+                       {reconcileStep === 2 && (
+                           <div className="space-y-4">
+                               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 flex justify-between items-center">
+                                   <div className="flex items-center gap-3">
+                                       <FileText className="text-indigo-600" size={24} />
+                                       <div>
+                                           <p className="font-bold text-indigo-900 dark:text-indigo-200">{reconcileFile?.name}</p>
+                                           <p className="text-xs text-indigo-700 dark:text-indigo-400">Processado com sucesso</p>
+                                       </div>
+                                   </div>
+                                   <span className="bg-white dark:bg-gray-800 text-indigo-600 text-xs font-bold px-2 py-1 rounded border border-indigo-200 dark:border-indigo-700">3 Lançamentos</span>
+                               </div>
+
+                               <table className="w-full text-sm text-left">
+                                   <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-900/50">
+                                       <tr>
+                                           <th className="px-4 py-3">Data</th>
+                                           <th className="px-4 py-3">Descrição Extrato</th>
+                                           <th className="px-4 py-3">Valor</th>
+                                           <th className="px-4 py-3">Status</th>
+                                           <th className="px-4 py-3">Ação</th>
+                                       </tr>
+                                   </thead>
+                                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                       {reconcileMatches.map((match) => (
+                                           <tr key={match.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                               <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{new Date(match.date).toLocaleDateString('pt-BR')}</td>
+                                               <td className="px-4 py-3 font-medium text-gray-800 dark:text-white">
+                                                   {match.desc}
+                                                   {match.systemDesc && <div className="text-xs text-indigo-500">Sistema: {match.systemDesc}</div>}
+                                               </td>
+                                               <td className={`px-4 py-3 font-bold ${match.amount < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                   R$ {match.amount.toFixed(2)}
+                                               </td>
+                                               <td className="px-4 py-3">
+                                                   {match.status === 'match' ? (
+                                                       <span className="inline-flex items-center gap-1 text-green-600 text-xs font-bold bg-green-50 px-2 py-1 rounded-full"><CheckCircle2 size={12}/> Conciliado</span>
+                                                   ) : (
+                                                       <span className="inline-flex items-center gap-1 text-orange-500 text-xs font-bold bg-orange-50 px-2 py-1 rounded-full"><TrendingUp size={12}/> Novo</span>
+                                                   )}
+                                               </td>
+                                               <td className="px-4 py-3">
+                                                   {match.status === 'match' ? (
+                                                       <button className="text-gray-400 cursor-not-allowed"><CheckCircle2 size={18}/></button>
+                                                   ) : (
+                                                        <button className="text-indigo-600 hover:underline text-xs font-bold">+ Lançar</button>
+                                                   )}
+                                               </td>
+                                           </tr>
+                                       ))}
+                                   </tbody>
+                               </table>
+                           </div>
+                       )}
+                   </div>
+                   
+                   {reconcileStep === 2 && (
+                       <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
+                           <button onClick={() => setShowReconcileModal(false)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold transition">Concluir Conciliação</button>
+                       </div>
+                   )}
                </div>
            </div>
        )}

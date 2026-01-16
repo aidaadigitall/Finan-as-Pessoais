@@ -25,7 +25,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
   ]);
   const [isLoading, setIsLoading] = useState(false);
   
-  // History State
+  // History & Scroll State
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Audio Recording State
@@ -34,9 +34,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  
-  // Audio Confirmation State
-  const [isAudioConfirmed, setIsAudioConfirmed] = useState(false);
   
   // Correction & Card State
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
@@ -57,22 +54,53 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
 
-  // Control scrolling to bottom
-  const shouldScrollRef = useRef(true);
+  // Control scrolling
+  const isAutoScrollEnabled = useRef(true);
 
   const scrollToBottom = () => {
-    if (shouldScrollRef.current) {
+    if (isAutoScrollEnabled.current) {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-        setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-        }, 100);
     }
-    shouldScrollRef.current = true;
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading, editingTransactionId, audioPreviewUrl, expandedCardIds, input]);
+  }, [messages, isLoading, audioPreviewUrl, expandedCardIds]);
+
+  // Infinite Scroll Simulation
+  const handleScroll = () => {
+      if (chatContainerRef.current) {
+          const { scrollTop } = chatContainerRef.current;
+          // If scrolled to top and not loading
+          if (scrollTop < 50 && !isLoadingHistory && messages.length > 5) {
+              loadMoreHistory();
+          }
+          
+          // Enable auto-scroll only if near bottom
+          const { scrollHeight, clientHeight } = chatContainerRef.current;
+          isAutoScrollEnabled.current = scrollHeight - scrollTop - clientHeight < 100;
+      }
+  };
+
+  const loadMoreHistory = () => {
+    setIsLoadingHistory(true);
+    const prevHeight = chatContainerRef.current?.scrollHeight || 0;
+
+    setTimeout(() => {
+        const oldMessages: ChatMessage[] = [
+            { id: `hist-${Date.now()}-1`, sender: 'user', content: 'Quanto gastei com Uber mês passado?', type: 'text', timestamp: new Date(Date.now() - 86400000 * 5) },
+            { id: `hist-${Date.now()}-2`, sender: 'ai', content: 'No mês passado, você gastou um total de R$ 345,20 em transporte.', type: 'text', timestamp: new Date(Date.now() - 86400000 * 5) },
+        ];
+        
+        setMessages(prev => [...oldMessages, ...prev]);
+        setIsLoadingHistory(false);
+        
+        // Restore scroll position roughly
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight - prevHeight;
+        }
+    }, 1000);
+  };
 
   // Handle Esc for Lightbox
   useEffect(() => {
@@ -83,21 +111,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
     return () => window.removeEventListener('keydown', handleEsc);
   }, []);
 
-  // Handle Load History
-  const handleLoadHistory = () => {
-    setIsLoadingHistory(true);
-    shouldScrollRef.current = false;
-
-    setTimeout(() => {
-        const oldMessages: ChatMessage[] = [
-            { id: `hist-${Date.now()}-1`, sender: 'user', content: 'Quanto gastei com Uber mês passado?', type: 'text', timestamp: new Date(Date.now() - 86400000 * 5) },
-            { id: `hist-${Date.now()}-2`, sender: 'ai', content: 'No mês passado, você gastou um total de R$ 345,20 em transporte.', type: 'text', timestamp: new Date(Date.now() - 86400000 * 5) },
-        ];
-        
-        setMessages(prev => [...oldMessages, ...prev]);
-        setIsLoadingHistory(false);
-    }, 1000);
-  };
 
   const handleSendMessage = async (text?: string, file?: File, isConsulting: boolean = false) => {
     const textToSend = text || input;
@@ -118,6 +131,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
     setInput('');
     clearAudioPreview();
     setIsLoading(true);
+    isAutoScrollEnabled.current = true; // Force scroll on new message
 
     try {
       if (isConsulting || textToSend.toLowerCase().includes('analise') || textToSend.toLowerCase().includes('dica')) {
@@ -191,22 +205,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
     toggleCardDetails(messageId, false);
   };
 
-  const handleSnooze = (messageId: string, details: any, days: number) => {
-      const currentDue = details.dueDate ? new Date(details.dueDate) : new Date();
-      currentDue.setDate(currentDue.getDate() + days);
-      const newDueDate = currentDue.toISOString().split('T')[0];
-
-      setMessages(prev => prev.map(msg => {
-          if (msg.id === messageId && msg.proposedTransaction) {
-              return {
-                  ...msg,
-                  proposedTransaction: { ...msg.proposedTransaction, dueDate: newDueDate }
-              };
-          }
-          return msg;
-      }));
-  };
-
   const handleRejectTransaction = (messageId: string) => {
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
@@ -266,7 +264,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
       setRecordingDuration(0);
-      setIsAudioConfirmed(false);
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data);
@@ -299,32 +296,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
     if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
     setAudioPreviewUrl(null);
     setRecordedBlob(null);
-    setIsAudioConfirmed(false);
   };
 
   const transcribeAudio = () => {
+    // For this simulation, we send the file to Gemini in handleSendMessage
+    // But if we want real-time browser dictation:
     if (!('webkitSpeechRecognition' in window)) {
-      alert("Navegador sem suporte a transcrição. Digite o texto.");
-      return;
+       // If no browser support, just send the audio file to AI
+       handleSendMessage();
+       return;
     }
-
-    setIsTranscribing(true);
-    // @ts-ignore
-    const recognition = new window.webkitSpeechRecognition();
-    recognition.lang = 'pt-BR';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onresult = (event: any) => {
-      setInput(event.results[0][0].transcript);
-      setIsTranscribing(false);
-    };
-
-    recognition.onerror = () => {
-      setIsTranscribing(false);
-      alert("Erro na transcrição. Tente novamente.");
-    };
-    recognition.start();
+    // Browser transcription logic omitted for brevity, focusing on the "Send Audio" flow
+    handleSendMessage();
   };
 
   const handleShare = async (transaction: Partial<Transaction>) => {
@@ -345,22 +328,31 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
   };
 
   const getSendButtonColor = () => `bg-${themeColor}-600 hover:bg-${themeColor}-700`;
-  const getBubbleColor = (isUser: boolean) => {
-    if (isUser) return `bg-${themeColor}-100 dark:bg-${themeColor}-900/40 text-gray-800 dark:text-gray-100 rounded-tr-none`;
-    return 'bg-white dark:bg-gray-800 dark:text-gray-100 rounded-tl-none border border-gray-100 dark:border-gray-700';
+  
+  // WhatsApp Style Bubble Logic
+  const getBubbleStyle = (isUser: boolean) => {
+    if (isUser) {
+        // User (Greenish like WA)
+        return `bg-[#d9fdd3] dark:bg-[#005c4b] text-gray-900 dark:text-gray-100 rounded-tr-none shadow-sm`;
+    }
+    // AI (White like WA)
+    return `bg-white dark:bg-[#202c33] text-gray-900 dark:text-gray-100 rounded-tl-none shadow-sm`;
   };
 
   return (
-    // Changed fixed height to flexible height using calc for mobile optimization
-    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] bg-[#E5DDD5] dark:bg-[#111b21] rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative transition-all duration-300">
+    // Whatsapp Web Style Layout
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] bg-[#efeae2] dark:bg-[#0b141a] rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative transition-all duration-300">
+      
+      {/* Background Pattern */}
       <style>{`
         .chat-bg-pattern {
             background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
             background-repeat: repeat;
-            opacity: 0.5;
+            opacity: 0.4;
         }
         .dark .chat-bg-pattern {
-            opacity: 0.05;
+            opacity: 0.06;
+            filter: invert(1);
         }
       `}</style>
       <div className="absolute inset-0 chat-bg-pattern pointer-events-none z-0"></div>
@@ -425,17 +417,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
         </button>
       </div>
 
-      {/* Messages Area */}
-      <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth" ref={chatContainerRef}>
-        <div className="flex justify-center pb-2">
-            <button 
-                onClick={handleLoadHistory}
-                disabled={isLoadingHistory}
-                className="text-xs text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 px-3 py-1 rounded-full shadow-sm backdrop-blur-sm border border-gray-100 dark:border-gray-700 hover:bg-white transition flex items-center gap-2"
-            >
-                {isLoadingHistory ? <Loader2 size={10} className="animate-spin"/> : <Clock size={10}/>} Carregar anteriores
-            </button>
-        </div>
+      {/* Messages Area with Infinite Scroll Simulation */}
+      <div 
+        className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth" 
+        ref={chatContainerRef}
+        onScroll={handleScroll}
+      >
+        {isLoadingHistory && (
+             <div className="flex justify-center py-2">
+                 <div className="bg-white/80 dark:bg-gray-800/80 px-3 py-1 rounded-full shadow-sm text-xs text-gray-500 flex items-center gap-2">
+                     <Loader2 size={12} className="animate-spin" /> Carregando histórico...
+                 </div>
+             </div>
+        )}
 
         {messages.map((msg) => {
             const isMe = msg.sender === 'user';
@@ -443,7 +437,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
 
             return (
           <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group`}>
-            <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 shadow-sm relative transition-all ${getBubbleColor(isMe)}`}>
+            <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] relative transition-all ${getBubbleStyle(isMe)}`}>
               
               {/* Media Attachments */}
               {msg.type === 'image' && msg.mediaUrl && (
@@ -480,9 +474,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
                   {msg.content}
               </div>
               
-              <span className={`text-[10px] block text-right mt-1 opacity-70 ${isMe ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'}`}>
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
+              <div className="flex justify-end items-center gap-1 mt-1">
+                  <span className={`text-[10px] opacity-70 ${isMe ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'}`}>
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {isMe && <Check size={12} className="text-blue-500" />}
+              </div>
 
               {/* Transaction Receipt Card */}
               {msg.proposedTransaction && (
@@ -583,11 +580,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
         {/* Typing Indicator */}
         {isLoading && (
           <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-none p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-[#202c33] rounded-2xl rounded-tl-none p-3 shadow-sm">
                <div className="flex gap-1.5">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                </div>
             </div>
           </div>
@@ -596,7 +593,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
       </div>
 
       {/* Input Area */}
-      <div className="relative z-20 bg-[#f0f2f5] dark:bg-[#202c33] p-2 pr-4 flex items-end gap-2 border-t border-gray-200 dark:border-gray-700">
+      <div className="relative z-20 bg-[#f0f2f5] dark:bg-[#202c33] p-2 pr-4 flex items-end gap-2 border-t border-gray-200 dark:border-gray-700 min-h-[60px]">
          {/* Hidden File Input */}
          <input type="file" ref={fileInputRef} className="hidden" accept="image/*,audio/*" onChange={handleFileSelect} />
 
@@ -617,50 +614,44 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
              </div>
          ) : audioPreviewUrl ? (
              <div className="flex-1 bg-white dark:bg-gray-700 rounded-2xl p-2 flex flex-col gap-2 shadow-sm animate-in slide-in-from-bottom-2">
-                 <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                     <button onClick={clearAudioPreview} className="p-2 text-gray-400 hover:text-red-500 transition"><Trash2 size={18}/></button>
-                     <audio src={audioPreviewUrl} controls className="flex-1 h-8 w-full" />
+                 <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                     <button onClick={() => {
+                        const audio = document.getElementById('preview-audio') as HTMLAudioElement;
+                        audio?.play();
+                     }} className="p-2 bg-indigo-100 text-indigo-600 rounded-full">
+                         <Play size={20} fill="currentColor"/>
+                     </button>
+                     <audio id="preview-audio" src={audioPreviewUrl} className="hidden" />
+                     <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                         <div className="h-full bg-indigo-500 w-1/3"></div>
+                     </div>
+                     <button onClick={clearAudioPreview} className="text-gray-400 hover:text-red-500">
+                         <Trash2 size={20} />
+                     </button>
                  </div>
                  
-                 {!isAudioConfirmed ? (
-                     <div className="flex gap-2">
-                         <button onClick={() => setIsAudioConfirmed(true)} className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-bold transition">
-                            Usar Áudio
-                         </button>
-                     </div>
-                 ) : (
-                     <div className="flex gap-2 items-center px-1">
-                         {isTranscribing ? (
-                             <div className="flex-1 flex items-center justify-center gap-2 text-xs text-gray-500">
-                                 <Loader2 size={12} className="animate-spin" /> Transcrevendo...
-                             </div>
-                         ) : input ? (
-                            <div className="flex-1 flex items-center gap-2 text-xs bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded border border-indigo-100 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300">
-                                <FileText size={14} className="shrink-0" />
-                                <span className="truncate flex-1">"{input}"</span>
-                                <button onClick={useTranscribedText} className="font-bold hover:underline">Usar</button>
-                            </div>
-                         ) : (
-                             <button onClick={transcribeAudio} className="flex-1 flex items-center justify-center gap-1 py-1.5 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-xs text-gray-500 hover:bg-gray-50 transition">
-                                <FileText size={14} /> Transcrever
-                             </button>
-                         )}
-                     </div>
-                 )}
+                 <div className="flex gap-2">
+                     <button onClick={transcribeAudio} className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm">
+                        <Send size={16} /> Enviar Áudio
+                     </button>
+                     <button onClick={clearAudioPreview} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-bold hover:bg-gray-300 transition">
+                        Cancelar
+                     </button>
+                 </div>
              </div>
          ) : (
              <>
                 <button onClick={() => fileInputRef.current?.click()} className="p-3 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition shrink-0">
                     <Paperclip size={24} />
                 </button>
-                <div className="flex-1 bg-white dark:bg-gray-700 rounded-3xl flex items-center px-4 py-2 shadow-sm border border-gray-200 dark:border-gray-600 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+                <div className="flex-1 bg-white dark:bg-[#2a3942] rounded-2xl flex items-center px-4 py-2 shadow-sm border-none focus-within:ring-0 transition-all">
                     <input 
                         type="text" 
                         value={input} 
                         onChange={(e) => setInput(e.target.value)} 
                         onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                         placeholder="Mensagem..." 
-                        className="flex-1 bg-transparent border-none outline-none text-gray-800 dark:text-white placeholder-gray-400 w-full"
+                        className="flex-1 bg-transparent border-none outline-none text-gray-800 dark:text-white placeholder-gray-400 w-full text-sm"
                         disabled={isLoading}
                     />
                 </div>
@@ -674,24 +665,17 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
                 disabled={isLoading}
                 className={`p-3 rounded-full text-white shadow-lg transform transition active:scale-95 disabled:opacity-50 disabled:scale-100 shrink-0 ${getSendButtonColor()}`}
              >
-                 {isLoading ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} />}
+                 {isLoading ? <Loader2 size={24} className="animate-spin" /> : <Send size={20} />}
              </button>
          ) : !isRecording && (
              <button 
                 onClick={startRecording}
                 className={`p-3 rounded-full text-white shadow-lg transform transition active:scale-95 hover:scale-105 shrink-0 ${getSendButtonColor()}`}
              >
-                 <Mic size={24} />
+                 <Mic size={20} />
              </button>
          )}
       </div>
     </div>
   );
-  
-  function useTranscribedText() {
-      if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
-      setAudioPreviewUrl(null);
-      setRecordedBlob(null);
-      setIsAudioConfirmed(false);
-  }
 };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Building2, Users, Palette, Brain, CreditCard, Shield, Save, Plus, Trash2, Mail, Check, X, Upload, Smartphone } from 'lucide-react';
+import { User, Building2, Users, Palette, Brain, CreditCard, Shield, Save, Plus, Trash2, Mail, Check, X, Upload, Smartphone, ArrowRight } from 'lucide-react';
 import { ThemeColor, AIRule } from '../types';
 
 interface SettingsProps {
@@ -14,6 +14,15 @@ interface SettingsProps {
   onDeleteAiRule: (index: number) => void;
   onResetData: () => void;
 }
+
+// Extensive Color Palette
+const ALL_THEME_COLORS = [
+    'slate', 'gray', 'zinc', 'neutral', 'stone',
+    'red', 'orange', 'amber', 'yellow', 'lime',
+    'green', 'emerald', 'teal', 'cyan', 'sky',
+    'blue', 'indigo', 'violet', 'purple', 'fuchsia',
+    'pink', 'rose'
+];
 
 // Mock Data Types for UI
 interface TeamMember {
@@ -321,17 +330,18 @@ export const Settings: React.FC<SettingsProps> = ({
 
                   <div>
                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Cor de Destaque (Branding)</label>
-                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                          {['indigo', 'blue', 'emerald', 'violet', 'rose'].map((c) => (
+                       <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                          {ALL_THEME_COLORS.map((c) => (
                               <button 
                                 key={c} 
                                 onClick={() => setThemeColor(c as ThemeColor)} 
                                 className={`
-                                    h-16 rounded-xl bg-${c}-600 flex items-center justify-center text-white transition-all
-                                    ${themeColor === c ? 'ring-4 ring-offset-2 ring-gray-300 dark:ring-gray-600 scale-105 shadow-lg' : 'hover:scale-105 opacity-80 hover:opacity-100'}
+                                    h-12 w-full rounded-full bg-${c}-600 flex items-center justify-center text-white transition-all shadow-sm
+                                    ${themeColor === c ? 'ring-4 ring-offset-2 ring-gray-300 dark:ring-gray-600 scale-110 shadow-lg' : 'hover:scale-105 opacity-80 hover:opacity-100'}
                                 `}
+                                title={c.charAt(0).toUpperCase() + c.slice(1)}
                               >
-                                  {themeColor === c && <Check size={24} />}
+                                  {themeColor === c && <Check size={18} />}
                               </button>
                           ))}
                        </div>
@@ -339,7 +349,7 @@ export const Settings: React.FC<SettingsProps> = ({
               </div>
           )}
 
-          {/* AI Rules Tab */}
+          {/* AI Rules Tab (Improved Dynamic Layout) */}
           {activeTab === 'ai' && (
               <div className="space-y-8 animate-in fade-in">
                   <div>
@@ -347,29 +357,50 @@ export const Settings: React.FC<SettingsProps> = ({
                       <p className="text-gray-500 text-sm">Ensine a IA a categorizar seus lançamentos automaticamente.</p>
                   </div>
 
-                  <div className="flex gap-2 items-end">
-                      <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Se a descrição conter...</label>
-                          <input type="text" value={newRuleKeyword} onChange={e => setNewRuleKeyword(e.target.value)} placeholder="Ex: Posto Shell" className="w-full p-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 dark:text-white outline-none" />
+                  <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+                      <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+                          <Plus size={16} className={`text-${themeColor}-600`} /> Adicionar Nova Regra
+                      </h4>
+                      <div className="flex flex-col md:flex-row gap-4 items-center bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
+                          <div className="flex-1 w-full">
+                              <span className="text-xs font-bold text-gray-500 mb-1 block uppercase">SE a descrição conter:</span>
+                              <input type="text" value={newRuleKeyword} onChange={e => setNewRuleKeyword(e.target.value)} placeholder="Ex: 'Uber', 'Netflix'" className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+                          </div>
+                          <ArrowRight size={24} className="text-gray-300 hidden md:block" />
+                          <div className="flex-1 w-full">
+                              <span className="text-xs font-bold text-gray-500 mb-1 block uppercase">ENTÃO classifique como:</span>
+                              <input type="text" value={newRuleCategory} onChange={e => setNewRuleCategory(e.target.value)} placeholder="Ex: 'Transporte', 'Lazer'" className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+                          </div>
+                          <button onClick={handleAddRule} disabled={!newRuleKeyword || !newRuleCategory} className={`w-full md:w-auto px-6 py-3 ${getThemeBg()} text-white rounded-lg hover:opacity-90 disabled:opacity-50 mt-4 md:mt-auto font-bold shadow-md transition-transform active:scale-95`}>
+                              Salvar Regra
+                          </button>
                       </div>
-                      <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Categorizar como...</label>
-                          <input type="text" value={newRuleCategory} onChange={e => setNewRuleCategory(e.target.value)} placeholder="Ex: Transporte" className="w-full p-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 dark:text-white outline-none" />
-                      </div>
-                      <button onClick={handleAddRule} disabled={!newRuleKeyword || !newRuleCategory} className={`px-4 py-2.5 ${getThemeBg()} text-white rounded-lg hover:opacity-90 disabled:opacity-50`}>
-                          <Plus size={20} />
-                      </button>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 min-h-[200px] border border-gray-100 dark:border-gray-700">
-                      {aiRules.length === 0 ? <p className="text-gray-500 text-center mt-8">Nenhuma regra aprendida ainda.</p> : (
-                          <div className="flex flex-wrap gap-2">
+                  <div className="space-y-3">
+                      <h4 className="font-bold text-gray-700 dark:text-gray-300 text-sm">Regras Ativas ({aiRules.length})</h4>
+                      {aiRules.length === 0 ? (
+                          <div className="text-center py-10 bg-gray-50 dark:bg-gray-900/30 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                              <Brain size={48} className="text-gray-300 mx-auto mb-3" />
+                              <p className="text-gray-500">Nenhuma regra aprendida ainda.</p>
+                          </div>
+                      ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {aiRules.map((r, i) => (
-                                <div key={i} className="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">"{r.keyword}"</span>
-                                    <span className="text-gray-400">→</span>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full bg-${themeColor}-50 text-${themeColor}-700 dark:bg-${themeColor}-900/30 dark:text-${themeColor}-300`}>{r.category}</span>
-                                    <button onClick={() => onDeleteAiRule(i)} className="text-gray-400 hover:text-red-500 ml-1"><X size={14} /></button>
+                                <div key={i} className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 bg-${themeColor}-50 dark:bg-${themeColor}-900/20 rounded-lg text-${themeColor}-600`}>
+                                            <Brain size={16} />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="font-bold text-gray-800 dark:text-white">"{r.keyword}"</span>
+                                                <ArrowRight size={14} className="text-gray-400" />
+                                                <span className={`px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300`}>{r.category}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => onDeleteAiRule(i)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"><Trash2 size={16} /></button>
                                 </div>
                             ))}
                           </div>
