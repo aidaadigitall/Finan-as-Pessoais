@@ -7,6 +7,7 @@ export default defineConfig({
     host: '0.0.0.0', // Expose to network (crucial for VPS)
     port: 5173,
   },
+  base: '/', // Ensure absolute path for assets on Vercel
   build: {
     outDir: 'dist',
     sourcemap: false
