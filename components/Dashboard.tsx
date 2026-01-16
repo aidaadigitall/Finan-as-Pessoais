@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { Transaction, TransactionType, TransactionStatus, ThemeColor, Category, RecurrenceLabels } from '../types';
-import { TrendingUp, TrendingDown, DollarSign, Calendar, FileText, Target, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Eye, Info, Wallet, PieChart as PieIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Calendar, FileText, Target, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Eye, Info, Wallet, PieChart as PieIcon, Activity } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -62,41 +62,72 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
     }, [])
     .sort((a, b) => b.value - a.value);
 
-  // Chart Data Preparation
+  // Chart Data Preparation (Bar Chart & Area Chart)
   let recentActivity = [];
+  let accumulatedData = [];
+  let currentBalance = 0;
   
   if (period === 'monthly') {
-      const days = new Map();
+      const daysMap = new Map();
+      
+      // Pre-fill map
       filteredTransactions.filter(t => t.status === TransactionStatus.CONFIRMED).forEach(t => {
           const day = new Date(t.date).getDate();
           const amount = t.amount || 0;
-          // Calculate net for the day
           const val = t.type === TransactionType.INCOME ? amount : -amount;
-          days.set(day, (days.get(day) || 0) + val);
+          daysMap.set(day, (daysMap.get(day) || 0) + val);
       });
       
       const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+      
       for (let i = 1; i <= daysInMonth; i++) {
+         const dayAmount = daysMap.get(i) || 0;
+         
+         // Bar Chart Data (Daily Net)
          recentActivity.push({ 
              name: i.toString(), 
-             amount: days.get(i) || 0,
-             // Helper for color coding bars
-             fill: (days.get(i) || 0) >= 0 ? '#10b981' : '#ef4444' 
+             amount: dayAmount,
+             fill: dayAmount >= 0 ? '#10b981' : '#ef4444' 
+         });
+
+         // Area Chart Data (Cumulative)
+         currentBalance += dayAmount;
+         accumulatedData.push({
+             name: i.toString(),
+             balance: currentBalance
          });
       }
   } else {
-      const months = new Map();
+      const monthsMap = new Map();
+      
+      // Pre-fill map
       filteredTransactions.filter(t => t.status === TransactionStatus.CONFIRMED).forEach(t => {
-          const m = new Date(t.date).toLocaleString('default', { month: 'short' });
+          const mIndex = new Date(t.date).getMonth();
           const amount = t.amount || 0;
           const val = t.type === TransactionType.INCOME ? amount : -amount;
-          months.set(m, (months.get(m) || 0) + val);
+          monthsMap.set(mIndex, (monthsMap.get(mIndex) || 0) + val);
       });
-      recentActivity = Array.from(months, ([name, amount]) => ({ 
-          name, 
-          amount,
-          fill: amount >= 0 ? '#10b981' : '#ef4444'
-      }));
+
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      
+      for (let i = 0; i < 12; i++) {
+          // Only show up to current month if annual (optional, but cleaner)
+          if (i > new Date().getMonth()) break; 
+
+          const monthAmount = monthsMap.get(i) || 0;
+          
+          recentActivity.push({ 
+              name: monthNames[i], 
+              amount: monthAmount,
+              fill: monthAmount >= 0 ? '#10b981' : '#ef4444'
+          });
+
+          currentBalance += monthAmount;
+          accumulatedData.push({
+              name: monthNames[i],
+              balance: currentBalance
+          });
+      }
   }
 
   const handleExportPDF = () => {
@@ -222,11 +253,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
       {/* Main Charts Area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Flow Chart */}
+        {/* Flow Chart (Bar) */}
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
              <TrendingUp size={20} className="text-gray-400" />
-             Fluxo Financeiro
+             Entradas e Saídas
           </h3>
           <div className="h-72">
              {recentActivity.length > 0 ? (
@@ -311,6 +342,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
                  </div>
              ))}
           </div>
+        </div>
+      </div>
+
+      {/* Cumulative Cash Flow Chart (Area) */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+            <Activity size={20} className="text-indigo-500" />
+            Fluxo de Caixa Acumulado
+        </h3>
+        <div className="h-64">
+             {accumulatedData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={accumulatedData}>
+                        <defs>
+                            <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" opacity={0.3} />
+                        <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tick={{fill: '#9ca3af'}} dy={10} />
+                        <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} tick={{fill: '#9ca3af'}} />
+                        <Tooltip 
+                            formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Saldo Acumulado']}
+                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                        />
+                        <Area 
+                            type="monotone" 
+                            dataKey="balance" 
+                            stroke="#6366f1" 
+                            strokeWidth={3}
+                            fillOpacity={1} 
+                            fill="url(#colorBalance)" 
+                        />
+                    </AreaChart>
+                </ResponsiveContainer>
+             ) : (
+                <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                    <Activity size={48} className="mb-2 opacity-20" />
+                    <p>Sem dados suficientes para gerar o fluxo acumulado.</p>
+                </div>
+             )}
         </div>
       </div>
 
