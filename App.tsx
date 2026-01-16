@@ -398,7 +398,7 @@ const App: React.FC = () => {
                                 {aiRules.length === 0 ? <p className="text-gray-500 text-center mt-8">Nenhuma regra.</p> : (
                                     aiRules.map((r, i) => (
                                         <div key={i} className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700">
-                                            <span className="text-sm dark:text-white">{r.keyword} -> {r.category}</span>
+                                            <span className="text-sm dark:text-white">{r.keyword} &rarr; {r.category}</span>
                                             <button onClick={() => handleDeleteAiRule(i)}><Trash2 size={16} className="text-red-500" /></button>
                                         </div>
                                     ))
