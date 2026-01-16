@@ -1,11 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TransactionType, Category, AIRule, Transaction } from "../types";
 
-// VITE USES import.meta.env, NOT process.env
-// Safely access env to prevent crashes if not defined
-const env = (import.meta as any).env || {};
-const API_KEY = env.VITE_GEMINI_API_KEY || '';
-
 // Helper to summarize financial data for the AI context
 const generateFinancialContext = (transactions: Transaction[], categories: Category[]) => {
   const now = new Date();
@@ -101,13 +96,8 @@ export const analyzeFinancialInput = async (
   availableCategories: Category[],
   userRules: AIRule[] = []
 ) => {
-  if (!API_KEY) {
-    console.error("API Key do Gemini não encontrada (VITE_GEMINI_API_KEY).");
-    return { isTransaction: false, transactionDetails: null, responseMessage: "Erro de configuração: Chave de API ausente. Verifique o arquivo .env" };
-  }
-
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const modelId = "gemini-3-flash-preview"; // Using Gemini 3 Flash as per guidelines
     const parts: any[] = [];
 
@@ -147,10 +137,8 @@ export const getFinancialAdvice = async (
   transactions: Transaction[],
   categories: Category[]
 ) => {
-  if (!API_KEY) return "Erro: Chave de API não configurada.";
-
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const modelId = "gemini-3-pro-preview"; // Using Gemini 3 Pro as per guidelines
 
     const financialContext = generateFinancialContext(transactions, categories);

@@ -8,12 +8,13 @@ import { AccountsReceivable } from './components/AccountsReceivable';
 import { WhatsAppIntegration } from './components/WhatsAppIntegration';
 import { BankAccountManager } from './components/BankAccountManager';
 import { TransactionModal } from './components/TransactionModal';
+import { Settings } from './components/Settings';
 import { analyzeFinancialInput } from './services/geminiService';
 import { Transaction, TransactionType, TransactionStatus, Category, AppNotification, ThemeColor, AIRule, WhatsAppConfig, BankAccount } from './types';
-import { LayoutDashboard, MessageSquare, List, Wallet, Tag, ArrowDownCircle, ArrowUpCircle, Bell, Settings, Moon, Sun, X, Check, Smartphone, User, Palette, Brain, Database, Trash2, LogOut, Save, Plus, Landmark, Menu } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, List, Wallet, Tag, ArrowDownCircle, ArrowUpCircle, Bell, Settings as SettingsIcon, Moon, Sun, X, Check, Smartphone, User, Palette, Brain, Database, Trash2, LogOut, Save, Plus, Landmark, Menu } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'list' | 'payable' | 'receivable' | 'categories' | 'whatsapp' | 'accounts'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'list' | 'payable' | 'receivable' | 'categories' | 'whatsapp' | 'accounts' | 'settings'>('dashboard');
   
   // Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -22,10 +23,6 @@ const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [themeColor, setThemeColor] = useState<ThemeColor>('indigo');
   
-  // Settings Modal State
-  const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'profile' | 'appearance' | 'ai' | 'data'>('profile');
-
   // Transaction Modal State
   const [showTransactionModal, setShowTransactionModal] = useState(false);
 
@@ -178,7 +175,8 @@ const App: React.FC = () => {
     { id: 'payable', icon: ArrowDownCircle, label: 'A Pagar' },
     { id: 'receivable', icon: ArrowUpCircle, label: 'A Receber' },
     { id: 'categories', icon: Tag, label: 'Categorias' },
-    { id: 'whatsapp', icon: Smartphone, label: 'Integrações' }
+    { id: 'whatsapp', icon: Smartphone, label: 'Integrações' },
+    { id: 'settings', icon: SettingsIcon, label: 'Configurações' }
   ];
 
   return (
@@ -285,7 +283,7 @@ const App: React.FC = () => {
              </div>
 
              <button 
-                onClick={() => { setShowSettings(true); setSettingsTab('profile'); }}
+                onClick={() => setActiveTab('settings')}
                 className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold border border-indigo-200 dark:border-indigo-800 shadow-sm"
              >
                  {userName.substring(0, 2).toUpperCase()}
@@ -306,6 +304,20 @@ const App: React.FC = () => {
             {activeTab === 'receivable' && <AccountsReceivable transactions={transactions} onToggleStatus={handleToggleStatus} />}
             {activeTab === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />}
             {activeTab === 'whatsapp' && <WhatsAppIntegration config={whatsAppConfig} onConnect={handleConnectWhatsApp} onDisconnect={handleDisconnectWhatsApp} onSimulateMessage={handleWhatsAppSimulation} themeColor={themeColor} />}
+            {activeTab === 'settings' && (
+              <Settings 
+                themeColor={themeColor} 
+                setThemeColor={setThemeColor}
+                userName={userName}
+                setUserName={setUserName}
+                userPhone={userPhone}
+                setUserPhone={setUserPhone}
+                aiRules={aiRules}
+                onAddAiRule={handleAddAiRule}
+                onDeleteAiRule={handleDeleteAiRule}
+                onResetData={handleResetData}
+              />
+            )}
           </div>
         </main>
       </div>
@@ -319,103 +331,6 @@ const App: React.FC = () => {
          accounts={bankAccounts}
          transactions={transactions}
       />
-
-      {/* Settings Modal (Responsive) */}
-      {showSettings && (
-         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-[85vh] md:h-auto md:max-h-[80vh]">
-                
-                {/* Mobile Settings Nav */}
-                <div className="md:hidden p-4 border-b border-gray-100 dark:border-gray-700 flex gap-2 overflow-x-auto no-scrollbar bg-gray-50 dark:bg-gray-900">
-                    {['profile', 'appearance', 'ai', 'data'].map(id => (
-                        <button key={id} onClick={() => setSettingsTab(id as any)} className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${settingsTab === id ? `bg-${themeColor}-600 text-white` : 'bg-white dark:bg-gray-800 text-gray-600'}`}>
-                           {id.charAt(0).toUpperCase() + id.slice(1)}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Desktop Settings Sidebar */}
-                <div className="hidden md:block w-1/3 bg-gray-50 dark:bg-gray-900/50 border-r border-gray-200 dark:border-gray-700 p-6">
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Configurações</h2>
-                    <nav className="flex flex-col gap-2">
-                        {[
-                            { id: 'profile', icon: User, label: 'Perfil' },
-                            { id: 'appearance', icon: Palette, label: 'Aparência' },
-                            { id: 'ai', icon: Brain, label: 'Inteligência' },
-                            { id: 'data', icon: Database, label: 'Dados' }
-                        ].map(item => (
-                            <button
-                                key={item.id}
-                                onClick={() => setSettingsTab(item.id as any)}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                                    settingsTab === item.id 
-                                    ? `bg-white dark:bg-gray-800 text-${themeColor}-600 dark:text-${themeColor}-400 shadow-md` 
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                                }`}
-                            >
-                                <item.icon size={18} />
-                                {item.label}
-                            </button>
-                        ))}
-                    </nav>
-                </div>
-
-                {/* Content Area */}
-                <div className="flex-1 p-6 md:p-8 overflow-y-auto relative bg-white dark:bg-gray-800">
-                    <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition">
-                        <X size={20} className="text-gray-500" />
-                    </button>
-
-                    {settingsTab === 'profile' && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Perfil</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome</label>
-                                    <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Telefone</label>
-                                    <input type="text" value={userPhone} onChange={(e) => setUserPhone(e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {settingsTab === 'appearance' && (
-                        <div className="space-y-6">
-                             <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Aparência</h3>
-                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                {['indigo', 'blue', 'emerald', 'violet', 'rose'].map((c) => (
-                                    <button key={c} onClick={() => setThemeColor(c as ThemeColor)} className={`h-12 rounded-xl bg-${c}-600 ${themeColor === c ? 'ring-4 ring-offset-2 ring-gray-300 dark:ring-gray-600' : ''}`}></button>
-                                ))}
-                             </div>
-                        </div>
-                    )}
-                    {settingsTab === 'ai' && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Regras da IA</h3>
-                            <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 min-h-[200px]">
-                                {aiRules.length === 0 ? <p className="text-gray-500 text-center mt-8">Nenhuma regra.</p> : (
-                                    aiRules.map((r, i) => (
-                                        <div key={i} className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700">
-                                            <span className="text-sm dark:text-white">{r.keyword} &rarr; {r.category}</span>
-                                            <button onClick={() => handleDeleteAiRule(i)}><Trash2 size={16} className="text-red-500" /></button>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    )}
-                    {settingsTab === 'data' && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Zona de Perigo</h3>
-                            <button onClick={handleResetData} className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 w-full md:w-auto">Resetar Dados</button>
-                        </div>
-                    )}
-                </div>
-            </div>
-         </div>
-      )}
     </div>
   );
 };

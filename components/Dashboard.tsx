@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { Transaction, TransactionType, TransactionStatus, ThemeColor, Category, RecurrenceLabels } from '../types';
-import { TrendingUp, TrendingDown, DollarSign, Calendar, FileText, Target, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Eye, Info, Wallet, PieChart as PieIcon, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Wallet, FileText, Target, ArrowUpCircle, ArrowDownCircle, Eye, Activity, PieChart as PieIcon, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -9,24 +9,22 @@ interface DashboardProps {
   categories: Category[];
 }
 
-// Psychological Colors: 
-// Expense: Red/Rose (Alert), Income: Emerald (Growth), Balance: Blue (Trust)
-const COLORS_EXPENSE = ['#ef4444', '#f87171', '#fca5a5', '#fbbf24', '#f59e0b', '#d97706'];
-const COLORS_INCOME = ['#10b981', '#34d399', '#6ee7b7', '#059669'];
+// Psychology of Money Palettes
+const COLORS_EXPENSE = ['#f43f5e', '#fb7185', '#fda4af', '#fbbf24', '#f59e0b', '#d97706']; // Rose to Amber (Urgency to Caution)
+const COLORS_INCOME = ['#10b981', '#34d399', '#6ee7b7', '#059669']; // Emerald (Growth)
 
 export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, categories }) => {
   const [period, setPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
 
-  // Filter Transactions based on Period
+  // --- Data Processing Logic ---
+
   const filteredTransactions = transactions.filter(t => {
       const tDate = new Date(t.date);
       const now = new Date();
-
       if (period === 'monthly') {
           return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
       } else {
-          // Annual = Current Year
           return tDate.getFullYear() === now.getFullYear();
       }
   });
@@ -38,7 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
       if (curr.type === TransactionType.INCOME) {
         acc.income += amount;
         acc.balance += amount;
-      } else {
+      } else if (curr.type === TransactionType.EXPENSE) {
         acc.expense += amount;
         acc.balance -= amount;
       }
@@ -46,6 +44,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
     },
     { income: 0, expense: 0, balance: 0 }
   );
+
+  // Savings Rate (Psychology: "Wealth is what you don't spend")
+  const savingsRate = stats.income > 0 ? ((stats.income - stats.expense) / stats.income) * 100 : 0;
 
   // Group by Category for Pie Chart
   const categoryData = filteredTransactions
@@ -62,92 +63,71 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
     }, [])
     .sort((a, b) => b.value - a.value);
 
-  // Chart Data Preparation (Bar Chart & Area Chart)
-  let recentActivity = [];
+  // Chart Data Preparation
+  let chartData = [];
   let accumulatedData = [];
   let currentBalance = 0;
   
-  if (period === 'monthly') {
-      const daysMap = new Map();
-      
-      // Pre-fill map
-      filteredTransactions.filter(t => t.status === TransactionStatus.CONFIRMED).forEach(t => {
-          const day = new Date(t.date).getDate();
-          const amount = t.amount || 0;
-          const val = t.type === TransactionType.INCOME ? amount : -amount;
-          daysMap.set(day, (daysMap.get(day) || 0) + val);
-      });
-      
-      const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-      
-      for (let i = 1; i <= daysInMonth; i++) {
-         const dayAmount = daysMap.get(i) || 0;
-         
-         // Bar Chart Data (Daily Net)
-         recentActivity.push({ 
-             name: i.toString(), 
-             amount: dayAmount,
-             fill: dayAmount >= 0 ? '#10b981' : '#ef4444' 
-         });
+  const generateChartData = () => {
+    const dataMap = new Map();
+    const isMonthly = period === 'monthly';
+    const loopLimit = isMonthly 
+        ? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() 
+        : 12;
+    const labels = isMonthly 
+        ? Array.from({length: loopLimit}, (_, i) => (i + 1).toString()) 
+        : ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-         // Area Chart Data (Cumulative)
-         currentBalance += dayAmount;
-         accumulatedData.push({
-             name: i.toString(),
-             balance: currentBalance
-         });
-      }
-  } else {
-      const monthsMap = new Map();
-      
-      // Pre-fill map
-      filteredTransactions.filter(t => t.status === TransactionStatus.CONFIRMED).forEach(t => {
-          const mIndex = new Date(t.date).getMonth();
-          const amount = t.amount || 0;
-          const val = t.type === TransactionType.INCOME ? amount : -amount;
-          monthsMap.set(mIndex, (monthsMap.get(mIndex) || 0) + val);
-      });
+    // Pre-fill
+    filteredTransactions.filter(t => t.status === TransactionStatus.CONFIRMED).forEach(t => {
+        const key = isMonthly ? new Date(t.date).getDate() - 1 : new Date(t.date).getMonth();
+        const amount = t.amount || 0;
+        const net = t.type === TransactionType.INCOME ? amount : (t.type === TransactionType.EXPENSE ? -amount : 0);
+        
+        if (!dataMap.has(key)) dataMap.set(key, { income: 0, expense: 0, net: 0 });
+        const entry = dataMap.get(key);
+        if (t.type === TransactionType.INCOME) entry.income += amount;
+        if (t.type === TransactionType.EXPENSE) entry.expense += amount;
+        entry.net += net;
+    });
 
-      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      
-      for (let i = 0; i < 12; i++) {
-          // Only show up to current month if annual (optional, but cleaner)
-          if (i > new Date().getMonth()) break; 
+    const recent = [];
+    const accumulated = [];
+    let runningBalance = 0;
 
-          const monthAmount = monthsMap.get(i) || 0;
-          
-          recentActivity.push({ 
-              name: monthNames[i], 
-              amount: monthAmount,
-              fill: monthAmount >= 0 ? '#10b981' : '#ef4444'
-          });
+    for (let i = 0; i < loopLimit; i++) {
+        // Stop annual chart at current month
+        if (!isMonthly && i > new Date().getMonth()) break;
 
-          currentBalance += monthAmount;
-          accumulatedData.push({
-              name: monthNames[i],
-              balance: currentBalance
-          });
-      }
-  }
+        const entry = dataMap.get(i) || { income: 0, expense: 0, net: 0 };
+        runningBalance += entry.net;
 
-  const handleExportPDF = () => {
-    window.print();
+        recent.push({
+            name: labels[i],
+            Receitas: entry.income,
+            Despesas: entry.expense,
+            Net: entry.net
+        });
+
+        accumulated.push({
+            name: labels[i],
+            balance: runningBalance
+        });
+    }
+    return { recent, accumulated };
   };
-  
+
+  const { recent: recentActivity, accumulated: accumulatedDataResult } = generateChartData();
+
   // Budget Logic
-  const currentMonthTransactions = transactions.filter(t => {
-      const now = new Date();
-      const tDate = new Date(t.date);
-      return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear() && t.status === TransactionStatus.CONFIRMED && t.type === TransactionType.EXPENSE;
-  });
   const categoriesWithBudget = categories.filter(c => c.budgetLimit && c.budgetLimit > 0);
   const getBudgetProgress = (categoryName: string, limit: number) => {
-      const spent = currentMonthTransactions
-          .filter(t => t.category === categoryName)
+      const spent = filteredTransactions
+          .filter(t => t.category === categoryName && t.type === TransactionType.EXPENSE)
           .reduce((sum, t) => sum + (t.amount || 0), 0);
       const percent = Math.min((spent / limit) * 100, 100);
       let color = 'bg-emerald-500';
-      if (percent > 90) color = 'bg-red-500';
+      if (percent > 90) color = 'bg-rose-500';
       else if (percent > 75) color = 'bg-amber-500';
       return { spent, percent, color };
   };
@@ -160,213 +140,168 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
       setExpandedTransactionId(prev => prev === id ? null : id);
   };
 
+  const formatCurrency = (val: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header & Filter */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 gap-4">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+      
+      {/* Header & Controls */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
          <div>
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <Wallet className="text-indigo-600 dark:text-indigo-400" />
-                Painel Financeiro
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">
+                Visão Geral
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Visão geral da sua saúde financeira.</p>
+            <p className="text-gray-500 dark:text-gray-400">
+                Gerencie sua riqueza com racionalidade e clareza.
+            </p>
          </div>
          
-         <div className="flex items-center gap-3 w-full md:w-auto">
+         <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
             <button 
-               onClick={handleExportPDF}
-               className="hidden md:flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-xl transition no-print bg-gray-50 dark:bg-gray-800"
-            >
-                <FileText size={16} /> Relatório
-            </button>
-            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-xl p-1 no-print w-full md:w-auto">
-                <button 
                 onClick={() => setPeriod('monthly')}
-                className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition shadow-sm ${period === 'monthly' ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
-                >
-                Mensal
-                </button>
-                <button 
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${period === 'monthly' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            >
+                Mês Atual
+            </button>
+            <button 
                 onClick={() => setPeriod('annual')}
-                className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition shadow-sm ${period === 'annual' ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
-                >
-                Anual
-                </button>
-            </div>
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${period === 'annual' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            >
+                Ano Atual
+            </button>
          </div>
       </div>
 
-      {/* Stats Cards - Financial Psychology Applied */}
+      {/* Psychology of Money Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Balance - Blue (Trust/Stability) */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-6 text-white shadow-lg shadow-indigo-200 dark:shadow-none transform transition hover:scale-[1.02]">
-           <div className="relative z-10">
-               <p className="text-blue-100 font-medium text-sm mb-1">Saldo Total</p>
-               <h3 className="text-3xl font-bold tracking-tight">R$ {stats.balance.toFixed(2)}</h3>
-               <div className="mt-4 flex items-center gap-2 text-blue-200 text-xs bg-white/10 w-fit px-2 py-1 rounded-lg backdrop-blur-sm">
-                   <Target size={12} />
-                   <span>{period === 'monthly' ? 'Resultado do Mês' : 'Acumulado do Ano'}</span>
+        {/* 1. BALANCE: Blue/Indigo -> Represents Trust, Stability, Logic */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 p-6 text-white shadow-xl shadow-indigo-200 dark:shadow-none transition-transform hover:scale-[1.01]">
+           <div className="relative z-10 flex flex-col h-full justify-between">
+               <div className="flex justify-between items-start">
+                   <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                       <ShieldCheck size={24} className="text-white" />
+                   </div>
+                   {savingsRate > 20 && (
+                       <span className="px-2 py-1 bg-emerald-400/20 backdrop-blur-md rounded text-[10px] font-bold uppercase tracking-wider text-emerald-100 border border-emerald-400/30">
+                           Saúde Alta
+                       </span>
+                   )}
+               </div>
+               <div>
+                   <p className="text-indigo-100 text-sm font-medium mb-1">Saldo Líquido</p>
+                   <h3 className="text-3xl font-bold tracking-tight">{formatCurrency(stats.balance)}</h3>
+                   <div className="mt-2 text-xs text-indigo-200 flex items-center gap-1">
+                       <Wallet size={12} />
+                       <span>Disponível para construir riqueza</span>
+                   </div>
                </div>
            </div>
-           <DollarSign className="absolute right-[-20px] bottom-[-20px] text-white opacity-10" size={120} />
+           {/* Abstract Decoration */}
+           <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white/10 to-transparent skew-x-12 opacity-50"></div>
+           <DollarSign className="absolute -right-6 -bottom-6 text-white/10 rotate-12" size={140} />
         </div>
 
-        {/* Income - Green (Growth) */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between group hover:border-emerald-200 dark:hover:border-emerald-900 transition-colors">
-          <div className="flex justify-between items-start">
-             <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Receitas</p>
-                <h3 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                  R$ {stats.income.toFixed(2)}
-                </h3>
-             </div>
-             <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                <TrendingUp size={24} />
-             </div>
-          </div>
-          <div className="w-full bg-gray-100 dark:bg-gray-700 h-1.5 rounded-full mt-4 overflow-hidden">
-             <div className="bg-emerald-500 h-full rounded-full" style={{ width: '100%' }}></div>
-          </div>
+        {/* 2. INCOME: Emerald/Teal -> Represents Growth, Nature, Vitality */}
+        <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 shadow-sm transition-all hover:border-emerald-200 dark:hover:border-emerald-800 group">
+           <div className="flex justify-between items-start mb-6">
+               <div>
+                   <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Entradas</p>
+                   <h3 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(stats.income)}</h3>
+               </div>
+               <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                   <TrendingUp size={22} />
+               </div>
+           </div>
+           <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{width: '100%'}}></div>
+                </div>
+                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">100%</span>
+           </div>
+           <p className="mt-3 text-xs text-gray-400">Recursos gerados no período.</p>
         </div>
 
-        {/* Expense - Red (Caution/Alert) */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between group hover:border-red-200 dark:hover:border-red-900 transition-colors">
-          <div className="flex justify-between items-start">
-             <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Despesas</p>
-                <h3 className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-                  R$ {stats.expense.toFixed(2)}
-                </h3>
-             </div>
-             <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl text-red-600 dark:text-red-400 group-hover:scale-110 transition-transform">
-                <TrendingDown size={24} />
-             </div>
-          </div>
-          <div className="w-full bg-gray-100 dark:bg-gray-700 h-1.5 rounded-full mt-4 overflow-hidden">
-             {/* Simple visual ratio of expense vs income */}
-             <div className="bg-red-500 h-full rounded-full" style={{ width: `${Math.min((stats.expense / (stats.income || 1)) * 100, 100)}%` }}></div>
-          </div>
+        {/* 3. EXPENSE: Rose/Pink -> Represents Caution, Attention (Not panic red) */}
+        <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 shadow-sm transition-all hover:border-rose-200 dark:hover:border-rose-800 group">
+           <div className="flex justify-between items-start mb-6">
+               <div>
+                   <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Saídas</p>
+                   <h3 className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">{formatCurrency(stats.expense)}</h3>
+               </div>
+               <div className="p-2.5 bg-rose-50 dark:bg-rose-900/20 rounded-xl text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
+                   <TrendingDown size={22} />
+               </div>
+           </div>
+           <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                    {/* Visual Ratio */}
+                    <div 
+                        className={`h-full rounded-full ${stats.expense > stats.income ? 'bg-red-600' : 'bg-rose-500'}`} 
+                        style={{width: `${Math.min((stats.expense / (stats.income || 1)) * 100, 100)}%`}}
+                    ></div>
+                </div>
+                <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                    {((stats.expense / (stats.income || 1)) * 100).toFixed(0)}%
+                </span>
+           </div>
+           <p className="mt-3 text-xs text-gray-400">Comprometimento da renda.</p>
         </div>
       </div>
 
-      {/* Main Charts Area */}
+      {/* Main Analysis Area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Flow Chart (Bar) */}
+        {/* Wealth Accumulation Chart (Area) - The "Big Picture" */}
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-             <TrendingUp size={20} className="text-gray-400" />
-             Entradas e Saídas
-          </h3>
-          <div className="h-72">
-             {recentActivity.length > 0 ? (
+            <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    <Activity size={20} className="text-indigo-500" />
+                    Acumulação de Capital
+                </h3>
+                {period === 'monthly' && (
+                    <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded-md">
+                        Fluxo Diário
+                    </span>
+                )}
+            </div>
+            
+            <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={recentActivity}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" opacity={0.3} />
-                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tick={{fill: '#9ca3af'}} dy={10} />
-                    <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} tick={{fill: '#9ca3af'}} />
-                    <Tooltip 
-                        cursor={{fill: '#f3f4f6', opacity: 0.4}} 
-                        formatter={(value: number) => [`R$ ${Math.abs(value || 0).toFixed(2)}`, value >= 0 ? 'Saldo Positivo' : 'Saldo Negativo']}
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                    />
-                    <Bar dataKey="amount" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-             ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
-                    <BarChart size={48} className="mb-2 opacity-20" />
-                    <p>Sem dados suficientes</p>
-                </div>
-             )}
-          </div>
-        </div>
-
-        {/* Categories Pie Chart */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2 flex items-center gap-2">
-             <PieIcon size={20} className="text-gray-400" />
-             Top Despesas
-          </h3>
-          <div className="h-60 relative">
-            {categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS_EXPENSE[index % COLORS_EXPENSE.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => `R$ ${(value || 0).toFixed(2)}`} 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
-                    <PieIcon size={48} className="mb-2 opacity-20" />
-                    <p>Sem despesas</p>
-                </div>
-            )}
-            {/* Center Text Overlay */}
-            {categoryData.length > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="text-center">
-                        <span className="text-xs text-gray-400 block">Total</span>
-                        <span className="font-bold text-gray-700 dark:text-gray-200">
-                            {categoryData.length} Cats
-                        </span>
-                    </div>
-                </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-2 mt-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
-             {categoryData.slice(0, 4).map((entry, index) => (
-                 <div key={index} className="flex items-center justify-between text-xs">
-                     <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: COLORS_EXPENSE[index % COLORS_EXPENSE.length]}}></span>
-                        <span className="text-gray-600 dark:text-gray-300 truncate max-w-[100px]">{entry.name}</span>
-                     </div>
-                     <span className="font-medium text-gray-700 dark:text-gray-200">R$ {entry.value.toFixed(0)}</span>
-                 </div>
-             ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Cumulative Cash Flow Chart (Area) */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-            <Activity size={20} className="text-indigo-500" />
-            Fluxo de Caixa Acumulado
-        </h3>
-        <div className="h-64">
-             {accumulatedData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={accumulatedData}>
+                    <AreaChart data={accumulatedDataResult}>
                         <defs>
                             <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8}/>
+                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
                                 <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                             </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" opacity={0.3} />
-                        <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tick={{fill: '#9ca3af'}} dy={10} />
-                        <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val}`} tick={{fill: '#9ca3af'}} />
+                        <XAxis 
+                            dataKey="name" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                            tick={{fill: '#9ca3af'}} 
+                            dy={10} 
+                            interval={period === 'monthly' ? 4 : 0}
+                        />
+                        <YAxis 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                            tickFormatter={(val) => `R$${val/1000}k`} 
+                            tick={{fill: '#9ca3af'}} 
+                        />
                         <Tooltip 
-                            formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Saldo Acumulado']}
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                            formatter={(value: number) => [`${formatCurrency(value)}`, 'Acumulado']}
+                            contentStyle={{ 
+                                borderRadius: '12px', 
+                                border: 'none', 
+                                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', 
+                                padding: '12px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.95)'
+                            }}
                         />
                         <Area 
                             type="monotone" 
@@ -375,47 +310,132 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
                             strokeWidth={3}
                             fillOpacity={1} 
                             fill="url(#colorBalance)" 
+                            animationDuration={1500}
                         />
                     </AreaChart>
                 </ResponsiveContainer>
-             ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
-                    <Activity size={48} className="mb-2 opacity-20" />
-                    <p>Sem dados suficientes para gerar o fluxo acumulado.</p>
+            </div>
+        </div>
+
+        {/* Psychology: "Where is the money going?" Pie Chart */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2 flex items-center gap-2">
+                <PieIcon size={20} className="text-rose-400" />
+                Destino dos Recursos
+            </h3>
+            
+            <div className="flex-1 min-h-[200px] relative">
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={categoryData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                            stroke="none"
+                            cornerRadius={4}
+                        >
+                            {categoryData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS_EXPENSE[index % COLORS_EXPENSE.length]} />
+                            ))}
+                        </Pie>
+                        <Tooltip 
+                            formatter={(value: number) => formatCurrency(value)} 
+                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                    </PieChart>
+                </ResponsiveContainer>
+                
+                {/* Center Text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                     <span className="text-xs text-gray-400 font-medium uppercase tracking-widest">Total</span>
+                     <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                        {categoryData.length} Cats
+                     </span>
                 </div>
-             )}
+            </div>
+
+            <div className="mt-4 space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                {categoryData.slice(0, 5).map((entry, index) => (
+                    <div key={index} className="flex items-center justify-between group cursor-default">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-8 rounded-full transition-all group-hover:h-4" style={{backgroundColor: COLORS_EXPENSE[index % COLORS_EXPENSE.length]}}></div>
+                            <div>
+                                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{entry.name}</p>
+                                <p className="text-[10px] text-gray-400">
+                                    {((entry.value / stats.expense) * 100).toFixed(1)}% do total
+                                </p>
+                            </div>
+                        </div>
+                        <span className="text-xs font-bold text-gray-600 dark:text-gray-400">
+                            {formatCurrency(entry.value)}
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
       </div>
 
-      {/* Budget & Recent Transactions Split */}
+      {/* Comparative Flow (Bar Chart) */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+             <ArrowRight size={20} className="text-gray-400" />
+             Entradas vs Saídas
+         </h3>
+         <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={recentActivity} barGap={0} barCategoryGap="20%">
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" opacity={0.3} />
+                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tick={{fill: '#9ca3af'}} dy={10} />
+                    <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `R$${val/1000}k`} tick={{fill: '#9ca3af'}} />
+                    <Tooltip 
+                        cursor={{fill: '#f3f4f6', opacity: 0.4}} 
+                        formatter={(value: number) => [formatCurrency(value)]}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                    />
+                    <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} stackId="a" />
+                    <Bar dataKey="Despesas" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={40} stackId="b" />
+                </BarChart>
+            </ResponsiveContainer>
+         </div>
+      </div>
+
+      {/* Bottom Section: Budget & Recent */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
-          {/* Budget Monitoring */}
-          {categoriesWithBudget.length > 0 && period === 'monthly' && (
+          {/* Budget Monitoring (Psychology: Limits create Freedom) */}
+          {categoriesWithBudget.length > 0 && (
             <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-                    <Target size={20} className="text-emerald-500" />
-                    Metas de Gastos
-                </h3>
-                <div className="space-y-5">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <Target size={20} className="text-indigo-500" />
+                        Metas Financeiras
+                    </h3>
+                    <span className="text-xs text-indigo-500 font-medium bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded">
+                        Planejamento
+                    </span>
+                </div>
+                
+                <div className="space-y-6">
                     {categoriesWithBudget.slice(0, 4).map(cat => {
                         const { spent, percent, color } = getBudgetProgress(cat.name, cat.budgetLimit!);
                         return (
-                            <div key={cat.id}>
-                                <div className="flex justify-between items-end mb-1">
+                            <div key={cat.id} className="relative">
+                                <div className="flex justify-between items-end mb-2">
                                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{cat.name}</span>
-                                    <div className="text-right">
-                                        <span className={`text-xs font-bold ${percent > 100 ? 'text-red-500' : 'text-gray-500'}`}>
-                                            {percent.toFixed(0)}%
-                                        </span>
-                                    </div>
+                                    <span className="text-xs font-medium text-gray-500">
+                                        {percent.toFixed(0)}% <span className="text-[10px] text-gray-400">usado</span>
+                                    </span>
                                 </div>
-                                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-1">
-                                    <div className={`h-2 rounded-full transition-all duration-700 ${color}`} style={{ width: `${percent}%` }}></div>
+                                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3 overflow-hidden shadow-inner">
+                                    <div className={`h-full rounded-full transition-all duration-1000 ease-out ${color}`} style={{ width: `${percent}%` }}></div>
                                 </div>
-                                <div className="flex justify-between text-[10px] text-gray-400">
-                                    <span>R$ {spent.toFixed(0)}</span>
-                                    <span>Meta: R$ {cat.budgetLimit}</span>
+                                <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-mono">
+                                    <span>{formatCurrency(spent)}</span>
+                                    <span>Meta: {formatCurrency(cat.budgetLimit!)}</span>
                                 </div>
                             </div>
                         );
@@ -424,68 +444,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
             </div>
           )}
 
-          {/* Recent Transactions List */}
+          {/* Recent List */}
           <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
               <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-                <Info size={20} className="text-blue-500" />
-                Lançamentos Recentes
+                <Zap size={20} className="text-amber-500" />
+                Atividade Recente
               </h3>
-              <div className="overflow-hidden">
-                {lastTransactions.length > 0 ? (
-                    <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {lastTransactions.map(t => (
-                            <div key={t.id} className="py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg px-2 transition-colors -mx-2">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-full ${t.type === TransactionType.INCOME ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'}`}>
-                                            {t.type === TransactionType.INCOME ? <ArrowUpCircle size={18} /> : <ArrowDownCircle size={18} />}
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-gray-800 dark:text-white text-sm">{t.description}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                {new Date(t.date).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} • {t.category}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className={`font-bold text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            {t.type === TransactionType.INCOME ? '+' : '-'} R$ {t.amount.toFixed(2)}
-                                        </span>
-                                        <button 
-                                        onClick={() => toggleDetails(t.id)}
-                                        className={`p-1.5 rounded-full transition ${expandedTransactionId === t.id ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`}
-                                        title="Detalhes"
-                                        >
-                                            <Eye size={16} />
-                                        </button>
-                                    </div>
+              <div className="space-y-1">
+                {lastTransactions.length > 0 ? lastTransactions.map((t, idx) => (
+                    <div key={t.id} onClick={() => toggleDetails(t.id)} className="group cursor-pointer rounded-xl p-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-full ${t.type === TransactionType.INCOME ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20'} transition-transform group-hover:scale-105`}>
+                                    {t.type === TransactionType.INCOME ? <ArrowUpCircle size={18} /> : <ArrowDownCircle size={18} />}
                                 </div>
-                                
-                                {expandedTransactionId === t.id && (
-                                    <div className="mt-3 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg text-sm animate-in fade-in slide-in-from-top-1 ml-11">
-                                        <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-                                            <div>
-                                                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Fonte</p>
-                                                <p className="text-gray-700 dark:text-gray-300 text-xs">{t.source === 'whatsapp_ai' ? 'IA / WhatsApp' : 'Manual'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Recorrência</p>
-                                                <p className="text-gray-700 dark:text-gray-300 text-xs">{t.recurrence && t.recurrence !== 'none' ? RecurrenceLabels[t.recurrence] : 'Única'}</p>
-                                            </div>
-                                            {t.originalInput && (
-                                                <div className="col-span-2 mt-1 pt-2 border-t border-gray-200 dark:border-gray-600">
-                                                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Input Original</p>
-                                                    <p className="italic text-gray-600 dark:text-gray-400 text-xs">"{t.originalInput}"</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                <div>
+                                    <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                        {t.description}
+                                    </p>
+                                    <p className="text-[10px] text-gray-400">
+                                        {new Date(t.date).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} • {t.category}
+                                    </p>
+                                </div>
                             </div>
-                        ))}
+                            <span className={`font-bold text-sm ${t.type === TransactionType.INCOME ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                {t.type === TransactionType.INCOME ? '+' : '-'} {formatCurrency(t.amount)}
+                            </span>
+                        </div>
+                        
+                        {/* Expanded Detail */}
+                        {expandedTransactionId === t.id && (
+                            <div className="mt-2 pl-12 text-xs text-gray-500 animate-in slide-in-from-top-1 fade-in">
+                                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700">
+                                    <p>Fonte: {t.source === 'whatsapp_ai' ? 'Automático (IA)' : 'Manual'}</p>
+                                    {t.originalInput && <p className="italic mt-1">"{t.originalInput}"</p>}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                ) : (
-                    <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">Nenhum lançamento recente.</p>
+                )) : (
+                    <div className="text-center py-10 text-gray-400">
+                        <p>Nenhuma transação recente.</p>
+                    </div>
                 )}
               </div>
           </div>
