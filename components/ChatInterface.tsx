@@ -351,7 +351,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
   };
 
   return (
-    <div className="flex flex-col h-[600px] bg-[#E5DDD5] dark:bg-[#111b21] rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative">
+    // Changed fixed height to flexible height using calc for mobile optimization
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] bg-[#E5DDD5] dark:bg-[#111b21] rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative transition-all duration-300">
       <style>{`
         .chat-bg-pattern {
             background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
@@ -405,12 +406,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
       {/* Header */}
       <div className={`relative z-10 px-4 py-3 flex items-center justify-between shadow-md bg-[#f0f2f5] dark:bg-[#202c33] border-b border-gray-200 dark:border-gray-700`}>
         <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full bg-${themeColor}-600 flex items-center justify-center text-white shadow-sm`}>
+            <div className={`w-10 h-10 rounded-full bg-${themeColor}-600 flex items-center justify-center text-white shadow-sm shrink-0`}>
                <Sparkles size={20} />
             </div>
-            <div>
-               <h2 className="font-bold text-gray-800 dark:text-white leading-tight">FinAI Assistente</h2>
-               <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+            <div className="min-w-0">
+               <h2 className="font-bold text-gray-800 dark:text-white leading-tight truncate">FinAI Assistente</h2>
+               <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 truncate">
                  {isLoading ? <span className="text-indigo-500 font-medium">Digitando...</span> : 'Online'}
                </p>
             </div>
@@ -418,14 +419,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
         <button 
            onClick={() => handleSendMessage("Faça uma análise completa da minha situação financeira.", undefined, true)}
            disabled={isLoading}
-           className={`px-3 py-1.5 rounded-full bg-white dark:bg-gray-700 text-${themeColor}-600 dark:text-${themeColor}-400 text-xs font-semibold shadow-sm border border-gray-200 dark:border-gray-600 hover:bg-gray-50 transition`}
+           className={`hidden sm:block px-3 py-1.5 rounded-full bg-white dark:bg-gray-700 text-${themeColor}-600 dark:text-${themeColor}-400 text-xs font-semibold shadow-sm border border-gray-200 dark:border-gray-600 hover:bg-gray-50 transition`}
         >
             Analisar Finanças
         </button>
       </div>
 
       {/* Messages Area */}
-      <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4" ref={chatContainerRef}>
+      <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth" ref={chatContainerRef}>
         <div className="flex justify-center pb-2">
             <button 
                 onClick={handleLoadHistory}
@@ -442,7 +443,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
 
             return (
           <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group`}>
-            <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-3 shadow-sm relative transition-all ${getBubbleColor(isMe)}`}>
+            <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 shadow-sm relative transition-all ${getBubbleColor(isMe)}`}>
               
               {/* Media Attachments */}
               {msg.type === 'image' && msg.mediaUrl && (
@@ -455,7 +456,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
               )}
               
               {msg.type === 'audio' && msg.mediaUrl && (
-                  <div className="flex items-center gap-3 bg-black/5 dark:bg-white/10 p-2 rounded-xl mb-2 min-w-[220px]">
+                  <div className="flex items-center gap-3 bg-black/5 dark:bg-white/10 p-2 rounded-xl mb-2 min-w-[200px]">
                       <button onClick={() => setLightboxMedia({ type: 'audio', url: msg.mediaUrl! })} className="p-2 bg-white dark:bg-gray-700 rounded-full shadow-sm text-gray-600 dark:text-gray-200">
                          <Play size={14} fill="currentColor" />
                       </button>
@@ -618,7 +619,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
              <div className="flex-1 bg-white dark:bg-gray-700 rounded-2xl p-2 flex flex-col gap-2 shadow-sm animate-in slide-in-from-bottom-2">
                  <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-xl">
                      <button onClick={clearAudioPreview} className="p-2 text-gray-400 hover:text-red-500 transition"><Trash2 size={18}/></button>
-                     <audio src={audioPreviewUrl} controls className="flex-1 h-8" />
+                     <audio src={audioPreviewUrl} controls className="flex-1 h-8 w-full" />
                  </div>
                  
                  {!isAudioConfirmed ? (
@@ -635,7 +636,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
                              </div>
                          ) : input ? (
                             <div className="flex-1 flex items-center gap-2 text-xs bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded border border-indigo-100 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300">
-                                <FileText size={14} />
+                                <FileText size={14} className="shrink-0" />
                                 <span className="truncate flex-1">"{input}"</span>
                                 <button onClick={useTranscribedText} className="font-bold hover:underline">Usar</button>
                             </div>
@@ -649,7 +650,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
              </div>
          ) : (
              <>
-                <button onClick={() => fileInputRef.current?.click()} className="p-3 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition">
+                <button onClick={() => fileInputRef.current?.click()} className="p-3 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition shrink-0">
                     <Paperclip size={24} />
                 </button>
                 <div className="flex-1 bg-white dark:bg-gray-700 rounded-3xl flex items-center px-4 py-2 shadow-sm border border-gray-200 dark:border-gray-600 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
@@ -659,7 +660,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
                         onChange={(e) => setInput(e.target.value)} 
                         onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                         placeholder="Mensagem..." 
-                        className="flex-1 bg-transparent border-none outline-none text-gray-800 dark:text-white placeholder-gray-400"
+                        className="flex-1 bg-transparent border-none outline-none text-gray-800 dark:text-white placeholder-gray-400 w-full"
                         disabled={isLoading}
                     />
                 </div>
@@ -671,14 +672,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
              <button 
                 onClick={() => handleSendMessage()} 
                 disabled={isLoading}
-                className={`p-3 rounded-full text-white shadow-lg transform transition active:scale-95 disabled:opacity-50 disabled:scale-100 ${getSendButtonColor()}`}
+                className={`p-3 rounded-full text-white shadow-lg transform transition active:scale-95 disabled:opacity-50 disabled:scale-100 shrink-0 ${getSendButtonColor()}`}
              >
                  {isLoading ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} />}
              </button>
          ) : !isRecording && (
              <button 
                 onClick={startRecording}
-                className={`p-3 rounded-full text-white shadow-lg transform transition active:scale-95 hover:scale-105 ${getSendButtonColor()}`}
+                className={`p-3 rounded-full text-white shadow-lg transform transition active:scale-95 hover:scale-105 shrink-0 ${getSendButtonColor()}`}
              >
                  <Mic size={24} />
              </button>
@@ -688,7 +689,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
   );
   
   function useTranscribedText() {
-      // Just clear audio preview so standard send logic picks up text 'input'
       if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
       setAudioPreviewUrl(null);
       setRecordedBlob(null);

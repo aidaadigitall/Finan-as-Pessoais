@@ -108,7 +108,7 @@ export const analyzeFinancialInput = async (
 
   try {
     const ai = new GoogleGenAI({ apiKey: API_KEY });
-    const modelId = "gemini-1.5-flash"; // Use stable model for now
+    const modelId = "gemini-3-flash-preview"; // Using Gemini 3 Flash as per guidelines
     const parts: any[] = [];
 
     if (mediaFile) {
@@ -151,7 +151,7 @@ export const getFinancialAdvice = async (
 
   try {
     const ai = new GoogleGenAI({ apiKey: API_KEY });
-    const modelId = "gemini-1.5-pro"; 
+    const modelId = "gemini-3-pro-preview"; // Using Gemini 3 Pro as per guidelines
 
     const financialContext = generateFinancialContext(transactions, categories);
     const systemInstruction = `Você é o FinAI Advisor. Contexto:\n${financialContext}`;
