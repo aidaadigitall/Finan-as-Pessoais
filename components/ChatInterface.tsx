@@ -398,13 +398,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
       {/* Header */}
       <div className={`relative z-10 px-4 py-3 flex items-center justify-between shadow-md bg-[#f0f2f5] dark:bg-[#202c33] border-b border-gray-200 dark:border-gray-700`}>
         <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full bg-${themeColor}-600 flex items-center justify-center text-white shadow-sm shrink-0`}>
-               <Sparkles size={20} />
+            <div className={`w-10 h-10 rounded-full bg-${themeColor}-600 flex items-center justify-center text-white shadow-sm shrink-0 transition-all ${isLoading ? `animate-pulse ring-4 ring-opacity-30 ring-${themeColor}-400 scale-105` : ''}`}>
+               <Sparkles size={20} className={isLoading ? 'animate-spin' : ''} />
             </div>
             <div className="min-w-0">
                <h2 className="font-bold text-gray-800 dark:text-white leading-tight truncate">FinAI Assistente</h2>
                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 truncate">
-                 {isLoading ? <span className="text-indigo-500 font-medium">Digitando...</span> : 'Online'}
+                 {isLoading ? <span className="text-indigo-500 font-medium animate-pulse flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Processando...</span> : 'Online'}
                </p>
             </div>
         </div>
@@ -483,7 +483,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
 
               {/* Transaction Receipt Card */}
               {msg.proposedTransaction && (
-                <div className="mt-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm animate-in zoom-in-95 duration-300">
+                <div className="mt-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm animate-in zoom-in-95 duration-500 ring-1 ring-black/5 dark:ring-white/10">
                   {/* Card Header */}
                   <div className={`px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center ${
                       msg.proposedTransaction.isPaid === false 
@@ -580,12 +580,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onAddTransaction, 
         {/* Typing Indicator */}
         {isLoading && (
           <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
-            <div className="bg-white dark:bg-[#202c33] rounded-2xl rounded-tl-none p-3 shadow-sm">
+            <div className="bg-white dark:bg-[#202c33] rounded-2xl rounded-tl-none p-3 shadow-sm flex items-center gap-2">
                <div className="flex gap-1.5">
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                </div>
+               <span className="text-[10px] text-gray-400">Analisando...</span>
             </div>
           </div>
         )}

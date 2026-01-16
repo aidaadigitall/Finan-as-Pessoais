@@ -90,6 +90,42 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
   });
 };
 
+const cleanAndParseJSON = (text: string) => {
+  try {
+    // 1. Remove Markdown code blocks if present (```json ... ```)
+    let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    // 2. Attempt parsing
+    const parsed = JSON.parse(cleanText);
+
+    // 3. Validate Schema Structure
+    if (typeof parsed !== 'object' || parsed === null) {
+        throw new Error("Resposta não é um objeto JSON válido.");
+    }
+
+    // Ensure essential keys exist
+    if (!('isTransaction' in parsed) || !('responseMessage' in parsed)) {
+         // Try to infer if it's a flat object or wrapped differently, but safer to fail gracefully
+         throw new Error("JSON faltando chaves obrigatórias (isTransaction, responseMessage).");
+    }
+
+    // If isTransaction is true, ensure details exist
+    if (parsed.isTransaction && !parsed.transactionDetails) {
+        parsed.isTransaction = false; // Fallback to safe state
+    }
+
+    return parsed;
+  } catch (error) {
+    console.warn("Falha ao parsear JSON da IA:", text, error);
+    // Return a safe fallback object that won't crash the UI
+    return {
+      isTransaction: false,
+      transactionDetails: null,
+      responseMessage: "Desculpe, tive uma pequena confusão interna ao processar os dados. Poderia reformular?"
+    };
+  }
+};
+
 export const analyzeFinancialInput = async (
   textInput: string | null,
   mediaFile: File | null,
@@ -120,14 +156,16 @@ export const analyzeFinancialInput = async (
 
     const responseText = response.text;
     if (!responseText) throw new Error("Sem resposta da IA");
-    return JSON.parse(responseText);
+    
+    // Use the robust validation helper
+    return cleanAndParseJSON(responseText);
 
   } catch (error) {
     console.error("Erro na análise Gemini:", error);
     return {
       isTransaction: false,
       transactionDetails: null,
-      responseMessage: "Desculpe, tive um problema ao processar sua solicitação."
+      responseMessage: "Desculpe, serviço temporariamente indisponível. Verifique sua chave de API ou conexão."
     };
   }
 };
