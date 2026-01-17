@@ -10,6 +10,8 @@ import { ChatInterface } from './components/ChatInterface';
 import { TransactionModal } from './components/TransactionModal';
 import { Settings } from './components/Settings';
 import { Auth } from './components/Auth';
+import { AccountsPayable } from './components/AccountsPayable';
+import { AccountsReceivable } from './components/AccountsReceivable';
 import { 
   Loader2, 
   LayoutDashboard, 
@@ -18,7 +20,9 @@ import {
   LogOut, 
   MessageSquare, 
   Plus, 
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  CalendarArrowDown,
+  CalendarArrowUp
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -43,42 +47,27 @@ const App: React.FC = () => {
         setLoading(false);
         return;
       }
-
-      // 1. Obter sessão atual
       const { data: { session: currentSession } } = await supabase!.auth.getSession();
       setSession(currentSession);
-
-      if (currentSession) {
-        await loadUserData(currentSession);
-      }
-
-      // 2. Escutar mudanças na auth (login/logout)
+      if (currentSession) await loadUserData(currentSession);
       const { data: { subscription } } = supabase!.auth.onAuthStateChange(async (_event, session) => {
         setSession(session);
         if (session) await loadUserData(session);
         setLoading(false);
       });
-
       setLoading(false);
       return () => subscription.unsubscribe();
     };
-
     initSession();
   }, []);
 
   const loadUserData = async (currentSession: any) => {
     try {
-      // Bootstrap da organização do usuário
-      const orgId = await authService.bootstrapUserOrganization(
-        currentSession.user.id, 
-        currentSession.user.email
-      );
-      
+      const orgId = await authService.bootstrapUserOrganization(currentSession.user.id, currentSession.user.email);
       const [transData, accData] = await Promise.all([
         financialService.getTransactions(orgId),
         financialService.getBankAccounts(orgId)
       ]);
-      
       if (transData) setTransactions(transData);
       if (accData) setAccounts(accData);
     } catch (e) {
@@ -108,9 +97,17 @@ const App: React.FC = () => {
     return <Auth onAuthSuccess={(s) => setSession(s)} themeColor={themeColor} />;
   }
 
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'chat', label: 'Assistente IA', icon: MessageSquare },
+    { id: 'list', label: 'Lançamentos', icon: List },
+    { id: 'payable', label: 'Contas a Pagar', icon: CalendarArrowUp },
+    { id: 'receivable', label: 'Contas a Receber', icon: CalendarArrowDown },
+    { id: 'settings', label: 'Ajustes', icon: SettingsIcon },
+  ];
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden font-sans">
-      {/* Sidebar e conteúdo principal permanecem os mesmos, mas usando dados da sessão */}
       <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-6 flex flex-col hidden lg:flex">
         <div className="mb-10 flex items-center gap-3">
            <div className={`p-2 bg-indigo-600 rounded-lg text-white`}>
@@ -119,18 +116,15 @@ const App: React.FC = () => {
            <span className="text-xl font-bold dark:text-white">FinAI SaaS</span>
         </div>
         <nav className="flex-1 space-y-1">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-            <LayoutDashboard size={20} /> <span className="font-medium">Dashboard</span>
-          </button>
-          <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'chat' ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-            <MessageSquare size={20} /> <span className="font-medium">Assistente IA</span>
-          </button>
-          <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'list' ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-            <List size={20} /> <span className="font-medium">Lançamentos</span>
-          </button>
-          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-            <SettingsIcon size={20} /> <span className="font-medium">Ajustes</span>
-          </button>
+          {navItems.map(item => (
+            <button 
+              key={item.id}
+              onClick={() => setActiveTab(item.id)} 
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+            >
+              <item.icon size={20} /> <span className="font-medium">{item.label}</span>
+            </button>
+          ))}
         </nav>
         <div className="mt-auto pt-6 border-t border-gray-100 dark:border-gray-700">
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition font-medium">
@@ -173,6 +167,20 @@ const App: React.FC = () => {
               themeColor={themeColor} 
               transactions={transactions} 
             />
+          )}
+          {activeTab === 'payable' && (
+              <AccountsPayable 
+                transactions={transactions} 
+                onToggleStatus={(id) => setTransactions(prev => prev.map(t => t.id === id ? {...t, isPaid: true} : t))} 
+                onOpenTransactionModal={() => setIsTransModalOpen(true)} 
+              />
+          )}
+          {activeTab === 'receivable' && (
+              <AccountsReceivable 
+                transactions={transactions} 
+                onToggleStatus={(id) => setTransactions(prev => prev.map(t => t.id === id ? {...t, isPaid: true} : t))} 
+                onOpenTransactionModal={() => setIsTransModalOpen(true)} 
+              />
           )}
           {activeTab === 'settings' && (
             <Settings 

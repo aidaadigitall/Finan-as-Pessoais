@@ -13,8 +13,8 @@ interface ErrorBoundaryState {
 }
 
 /**
- * Fix: Extended React.Component<ErrorBoundaryProps, ErrorBoundaryState> 
- * to ensure 'this.state' and 'this.props' are correctly typed.
+ * Fix: Ensure the class correctly inherits from React.Component with generic types
+ * to resolve 'Property state/props does not exist' errors.
  */
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
