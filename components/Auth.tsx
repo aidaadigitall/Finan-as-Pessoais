@@ -1,18 +1,13 @@
 
 import React, { useState } from 'react';
 import { authService } from '../services/authService';
-import { Landmark, Mail, Lock, Loader2, ArrowRight, Info, CheckCircle2, X } from 'lucide-react';
+import { Landmark, Mail, Lock, Loader2, ArrowRight, Info } from 'lucide-react';
 import { ThemeColor } from '../types';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthProps {
   onAuthSuccess: (session: any) => void;
   themeColor: ThemeColor;
-}
-
-interface Toast {
-  message: string;
-  type: 'info' | 'success' | 'error';
-  visible: boolean;
 }
 
 export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
@@ -21,18 +16,12 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast>({ message: '', type: 'info', visible: false });
-
-  const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setToast({ message, type, visible: true });
-    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
-  };
 
   const handleGoogleLogin = async () => {
+    setError(null);
     setLoading(true);
     try {
       await authService.signInWithGoogle();
-      // O redirecionamento é controlado pelo Supabase
     } catch (err: any) {
       setError(err.message || 'Erro ao conectar com Google');
       setLoading(false);
@@ -50,7 +39,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
         result = await authService.signIn(email, password);
       } else {
         result = await authService.signUp(email, password);
-        showToast("Verifique seu e-mail para confirmar o cadastro!", "success");
+        setError("Verifique seu e-mail para confirmar o cadastro!");
       }
       if (result?.session) onAuthSuccess(result.session);
     } catch (err: any) {
@@ -60,27 +49,10 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
     }
   };
 
+  const configured = isSupabaseConfigured();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0b0e14] relative overflow-hidden p-4">
-      {/* Toast Notification */}
-      {toast.visible && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 fade-in duration-300">
-          <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border ${
-            toast.type === 'info' ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-100' : 
-            toast.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-100' :
-            'bg-rose-500/10 border-rose-500/50 text-rose-100'
-          }`}>
-            {toast.type === 'info' && <Info size={20} className="text-indigo-400" />}
-            {toast.type === 'success' && <CheckCircle2 size={20} className="text-emerald-400" />}
-            <span className="text-sm font-medium">{toast.message}</span>
-            <button onClick={() => setToast(prev => ({ ...prev, visible: false }))} className="ml-2 hover:opacity-70">
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Background Decor */}
       <div className={`absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-indigo-600/10 rounded-full blur-[120px] animate-pulse`}></div>
 
       <div className="w-full max-w-md relative z-10">
@@ -89,34 +61,20 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
             <Landmark size={40} />
           </div>
           <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">FinAI <span className="text-indigo-500/80">SaaS</span></h1>
-          <p className="text-gray-400 font-medium">Gestão financeira multi-tenant com IA</p>
+          <p className="text-gray-400 font-medium">Gestão financeira com Inteligência Artificial</p>
         </div>
 
         <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl">
-          <button 
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full mb-6 py-4 bg-white text-gray-900 rounded-2xl font-bold transition-all shadow-xl flex items-center justify-center gap-3 hover:bg-gray-100 disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : (
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-            )}
-            Continuar com Google
-          </button>
-
-          <div className="relative flex items-center justify-center mb-8">
-            <div className="border-t border-white/10 w-full"></div>
-            <span className="bg-[#161b22] px-4 text-[10px] text-gray-500 uppercase font-black tracking-widest absolute">OU EMAIL</span>
-          </div>
+          {!configured && (
+            <div className="bg-rose-500/10 border border-rose-500/50 text-rose-400 text-xs p-4 rounded-2xl flex gap-3 mb-6">
+              <Info size={16} className="shrink-0" />
+              O Supabase não está configurado. Verifique as variáveis de ambiente.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-rose-500/10 border border-rose-500/50 text-rose-400 text-xs p-4 rounded-2xl flex gap-3">
+              <div className="bg-indigo-500/10 border border-indigo-500/50 text-indigo-400 text-xs p-4 rounded-2xl flex gap-3">
                 <Info size={16} className="shrink-0" />
                 {error}
               </div>
@@ -154,19 +112,40 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
 
             <button 
               type="submit"
-              disabled={loading}
+              disabled={loading || !configured}
               className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : (isLogin ? 'Login' : 'Criar Conta')}
+              {loading ? <Loader2 className="animate-spin" size={20} /> : (isLogin ? 'Entrar no Sistema' : 'Criar minha conta')}
               {!loading && <ArrowRight size={20} />}
             </button>
           </form>
 
+          <div className="relative flex items-center justify-center my-8">
+            <div className="border-t border-white/10 w-full"></div>
+            <span className="bg-[#12161d] px-4 text-[9px] text-gray-500 uppercase font-black tracking-[0.3em] absolute">OU</span>
+          </div>
+
+          <button 
+            onClick={handleGoogleLogin}
+            disabled={loading || !configured}
+            className="w-full py-4 bg-white text-gray-900 rounded-2xl font-bold transition-all shadow-xl flex items-center justify-center gap-3 hover:bg-gray-100 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="animate-spin" size={20} /> : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+            )}
+            Continuar com Google
+          </button>
+
           <button 
             onClick={() => setIsLogin(!isLogin)}
-            className="w-full mt-6 text-xs text-gray-500 hover:text-white transition-colors"
+            className="w-full mt-8 text-xs text-gray-500 hover:text-white transition-colors"
           >
-            {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Faça login"}
+            {isLogin ? "Não tem conta? Cadastre-se gratuitamente" : "Já possui uma conta? Faça o login"}
           </button>
         </div>
       </div>

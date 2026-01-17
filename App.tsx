@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { authService } from './services/authService';
 import { financialService } from './services/financialService';
-import { Transaction, BankAccount, Category, TransactionStatus, TransactionType } from './types';
+import { Transaction, BankAccount, Category } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
 import { ChatInterface } from './components/ChatInterface';
@@ -18,21 +18,14 @@ import {
   LogOut, 
   MessageSquare, 
   Plus, 
-  Settings as SettingsIcon,
-  AlertTriangle
+  Settings as SettingsIcon
 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
-  const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isConfigured, setIsConfigured] = useState(true); // Forçamos true para garantir renderização
-  
-  // Dados de Exemplo para garantir que o sistema não abra vazio
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [accounts, setAccounts] = useState<BankAccount[]>([
-    { id: 'default', name: 'Carteira Principal', bankName: 'Demo', initialBalance: 1500, currentBalance: 1500, color: 'indigo', icon: 'wallet' }
-  ]);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [categories] = useState<Category[]>([
     { id: '1', name: 'Alimentação', type: 'expense', budgetLimit: 500 },
     { id: '2', name: 'Moradia', type: 'expense', budgetLimit: 2000 },
@@ -47,30 +40,25 @@ const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        // Timeout de 3 segundos para desistir de esperar o banco se estiver lento
-        const authTimeout = setTimeout(() => setLoading(false), 3000);
-
         if (isSupabaseConfigured() && supabase) {
           const { data: { session: currentSession } } = await supabase.auth.getSession();
           if (currentSession) {
             setSession(currentSession);
             try {
               const orgId = await authService.bootstrapUserOrganization(currentSession.user.id, currentSession.user.email);
-              setCurrentOrgId(orgId);
               const [transData, accData] = await Promise.all([
                 financialService.getTransactions(orgId),
                 financialService.getBankAccounts(orgId)
               ]);
               if (transData) setTransactions(transData);
-              if (accData && accData.length > 0) setAccounts(accData);
+              if (accData) setAccounts(accData);
             } catch (e) {
-              console.warn("Usando Modo Offline/Demo");
+              console.error("Erro ao carregar dados organizacionais.");
             }
           }
-          clearTimeout(authTimeout);
         }
       } catch (err) {
-        console.error("Erro inicialização:", err);
+        console.error("Erro na inicialização do App.");
       } finally {
         setLoading(false);
       }
@@ -92,13 +80,12 @@ const App: React.FC = () => {
             <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center animate-bounce shadow-2xl shadow-indigo-500/20">
                 <Landmark className="text-white" size={32} />
             </div>
-            <p className="text-gray-400 font-medium animate-pulse">Abrindo FinAI...</p>
+            <p className="text-gray-400 font-medium animate-pulse">Sincronizando com Supabase...</p>
         </div>
       </div>
     );
   }
 
-  // Se não houver sessão, mostramos o Auth mas permitimos "pular" para teste se necessário
   if (!session) {
     return <Auth onAuthSuccess={(s) => setSession(s)} themeColor={themeColor} />;
   }

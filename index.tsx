@@ -13,11 +13,10 @@ interface ErrorBoundaryState {
 }
 
 /**
- * Fix: Explicitly define generic types <ErrorBoundaryProps, ErrorBoundaryState> 
- * to ensure 'this.state' and 'this.props' are correctly typed and accessible in the class.
+ * Fix: Extended React.Component<ErrorBoundaryProps, ErrorBoundaryState> 
+ * to ensure 'this.state' and 'this.props' are correctly typed.
  */
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Use public/private modifiers or satisfy the generic by passing props to super
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -35,7 +34,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   render() {
-    // Accessing this.state is now valid with proper generic extension
+    // Correctly accessing state from the generic Component class
     const { hasError, error } = this.state;
 
     if (hasError) {
@@ -83,7 +82,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
     
-    // Accessing this.props is now valid with proper generic extension
+    // Correctly accessing props from the generic Component class
     return this.props.children;
   }
 }
