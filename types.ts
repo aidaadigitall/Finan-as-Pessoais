@@ -2,7 +2,8 @@
 export enum TransactionType {
   INCOME = 'income',
   EXPENSE = 'expense',
-  TRANSFER = 'transfer'
+  TRANSFER = 'transfer',
+  CREDIT_CARD = 'credit_card'
 }
 
 export enum TransactionStatus {
@@ -33,58 +34,45 @@ export interface BankAccount {
   initialBalance: number;
   currentBalance: number;
   color: string;
-  icon: string; // Lucide icon name placeholder
+  icon: string;
+}
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  brand: 'visa' | 'mastercard' | 'elo' | 'amex';
+  limit: number;
+  usedLimit: number;
+  closingDay: number;
+  dueDay: number;
+  color: string;
+  accountId: string; // Conta débito para pagamento
 }
 
 export interface Category {
   id: string;
   name: string;
   type: CategoryType;
-  budgetLimit?: number; // Teto de gastos mensal
+  budgetLimit?: number;
 }
 
 export interface Transaction {
   id: string;
-  date: string; // Data do lançamento (competência)
-  dueDate?: string; // Data de vencimento (para contas a pagar/receber)
+  date: string;
+  dueDate?: string;
   description: string;
   amount: number;
   type: TransactionType;
   category: string;
-  status: TransactionStatus; // Status da auditoria IA
-  isPaid: boolean; // Status financeiro (Pago/Pendente)
-  source: 'whatsapp_ai' | 'manual';
+  status: TransactionStatus;
+  isPaid: boolean;
+  source: 'whatsapp_ai' | 'manual' | 'import';
   originalInput?: string;
   recurrence?: RecurrenceFrequency;
-  accountId?: string; // Conta de origem/destino principal
-  destinationAccountId?: string; // Para transferências
-  reconciled?: boolean; // Conciliação bancária
-}
-
-export interface ChatMessage {
-  id: string;
-  sender: 'user' | 'ai';
-  content: string;
-  type: 'text' | 'image' | 'audio';
-  mediaUrl?: string;
-  timestamp: Date;
-  proposedTransaction?: Partial<Transaction>;
-}
-
-export interface DashboardStats {
-  balance: number;
-  income: number;
-  expense: number;
-}
-
-export interface AppNotification {
-  id: string;
-  title: string;
-  message: string;
-  type: 'warning' | 'info' | 'success';
-  read: boolean;
-  date: string;
-  transactionId?: string;
+  accountId?: string;
+  destinationAccountId?: string;
+  creditCardId?: string;
+  reconciled?: boolean;
 }
 
 export type ThemeColor = 'indigo' | 'blue' | 'emerald' | 'violet' | 'rose';
@@ -98,4 +86,15 @@ export interface WhatsAppConfig {
   status: 'connected' | 'disconnected' | 'connecting';
   phoneNumber: string | null;
   instanceId: string | null;
+}
+
+// Added missing ChatMessage interface
+export interface ChatMessage {
+  id: string;
+  sender: 'ai' | 'user';
+  content: string;
+  type: 'text' | 'image' | 'audio';
+  timestamp: Date;
+  mediaUrl?: string;
+  proposedTransaction?: Partial<Transaction>;
 }

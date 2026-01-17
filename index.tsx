@@ -19,6 +19,7 @@ interface ErrorBoundaryState {
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
+    // Properly initializing state defined in the generic type
     this.state = {
       hasError: false,
       error: null

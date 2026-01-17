@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { authService } from './services/authService';
 import { financialService } from './services/financialService';
-import { Transaction, BankAccount, Category } from './types';
+import { Transaction, BankAccount, Category, CreditCard as CreditCardType } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
 import { ChatInterface } from './components/ChatInterface';
@@ -12,6 +12,9 @@ import { Settings } from './components/Settings';
 import { Auth } from './components/Auth';
 import { AccountsPayable } from './components/AccountsPayable';
 import { AccountsReceivable } from './components/AccountsReceivable';
+import { BankAccountManager } from './components/BankAccountManager';
+import { CreditCardManager } from './components/CreditCardManager';
+import { StatementImporter } from './components/StatementImporter';
 import { 
   Loader2, 
   LayoutDashboard, 
@@ -22,7 +25,9 @@ import {
   Plus, 
   Settings as SettingsIcon,
   CalendarArrowDown,
-  CalendarArrowUp
+  CalendarArrowUp,
+  CreditCard,
+  RefreshCw
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -30,6 +35,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [creditCards, setCreditCards] = useState<CreditCardType[]>([]);
   const [categories] = useState<Category[]>([
     { id: '1', name: 'Alimentação', type: 'expense', budgetLimit: 500 },
     { id: '2', name: 'Moradia', type: 'expense', budgetLimit: 2000 },
@@ -70,6 +76,12 @@ const App: React.FC = () => {
       ]);
       if (transData) setTransactions(transData);
       if (accData) setAccounts(accData);
+      
+      // Mock de cartões para visualização
+      setCreditCards([
+        { id: 'c1', name: 'Nubank Platinum', brand: 'mastercard', limit: 5000, usedLimit: 1200, closingDay: 25, dueDay: 2, color: 'from-purple-600 to-indigo-800', accountId: accData[0]?.id },
+        { id: 'c2', name: 'XP Investimentos', brand: 'visa', limit: 12000, usedLimit: 450, closingDay: 15, dueDay: 22, color: 'from-gray-800 to-black', accountId: accData[0]?.id }
+      ]);
     } catch (e) {
       console.error("Erro ao carregar dados do usuário:", e);
     }
@@ -103,6 +115,9 @@ const App: React.FC = () => {
     { id: 'list', label: 'Lançamentos', icon: List },
     { id: 'payable', label: 'Contas a Pagar', icon: CalendarArrowUp },
     { id: 'receivable', label: 'Contas a Receber', icon: CalendarArrowDown },
+    { id: 'banks', label: 'Bancos e Saldo', icon: Landmark },
+    { id: 'cards', label: 'Cartões de Crédito', icon: CreditCard },
+    { id: 'reconcile', label: 'Importar Extrato', icon: RefreshCw },
     { id: 'settings', label: 'Ajustes', icon: SettingsIcon },
   ];
 
@@ -115,14 +130,14 @@ const App: React.FC = () => {
            </div>
            <span className="text-xl font-bold dark:text-white">FinAI SaaS</span>
         </div>
-        <nav className="flex-1 space-y-1">
+        <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-2">
           {navItems.map(item => (
             <button 
               key={item.id}
               onClick={() => setActiveTab(item.id)} 
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
             >
-              <item.icon size={20} /> <span className="font-medium">{item.label}</span>
+              <item.icon size={20} /> <span className="font-medium text-sm">{item.label}</span>
             </button>
           ))}
         </nav>
@@ -136,18 +151,20 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-y-auto p-4 lg:p-8">
         <header className="mb-8 flex justify-between items-center">
            <div>
-              <h2 className="text-2xl font-bold dark:text-white">Olá, {session.user.user_metadata?.full_name || session.user.email?.split('@')[0]}</h2>
+              <h2 className="text-2xl font-bold dark:text-white tracking-tight">
+                Olá, {session.user.user_metadata?.full_name || session.user.email?.split('@')[0]}
+              </h2>
               <p className="text-gray-500 text-sm">Organização: {session.user.email}</p>
            </div>
            <button 
              onClick={() => setIsTransModalOpen(true)}
-             className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition flex items-center gap-2"
+             className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition flex items-center gap-2"
            >
              <Plus size={20} /> Novo Lançamento
            </button>
         </header>
 
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto pb-10">
           {activeTab === 'dashboard' && <Dashboard transactions={transactions} themeColor={themeColor} categories={categories} />}
           {activeTab === 'list' && (
             <TransactionList 
@@ -181,6 +198,29 @@ const App: React.FC = () => {
                 onToggleStatus={(id) => setTransactions(prev => prev.map(t => t.id === id ? {...t, isPaid: true} : t))} 
                 onOpenTransactionModal={() => setIsTransModalOpen(true)} 
               />
+          )}
+          {activeTab === 'banks' && (
+            <BankAccountManager 
+              accounts={accounts} 
+              transactions={transactions}
+              onAddAccount={(a) => setAccounts(prev => [...prev, a])}
+              onUpdateAccount={(a) => setAccounts(prev => prev.map(i => i.id === a.id ? a : i))}
+              onDeleteAccount={(id) => setAccounts(prev => prev.filter(i => i.id !== id))}
+            />
+          )}
+          {activeTab === 'cards' && (
+            <CreditCardManager 
+              cards={creditCards} 
+              transactions={transactions}
+              onAddCard={(c) => setCreditCards(prev => [...prev, c])}
+              onDeleteCard={(id) => setCreditCards(prev => prev.filter(i => i.id !== id))}
+            />
+          )}
+          {activeTab === 'reconcile' && (
+            <StatementImporter 
+              accounts={accounts}
+              onImport={(newTrans) => setTransactions(prev => [...newTrans, ...prev])}
+            />
           )}
           {activeTab === 'settings' && (
             <Settings 
