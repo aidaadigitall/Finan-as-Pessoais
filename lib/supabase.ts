@@ -1,5 +1,5 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const getEnvVar = (key: string): string => {
   return (
@@ -13,19 +13,28 @@ const getEnvVar = (key: string): string => {
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
 const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-// Só criamos o cliente se os dados básicos existirem e forem válidos
-const supabaseInstance = (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) 
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+// Singleton para o cliente
+let supabaseInstance: SupabaseClient | null = null;
+
+if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+}
 
 export const supabase = supabaseInstance;
 
-export const isSupabaseConfigured = () => {
-    return !!supabaseInstance;
+export const isSupabaseConfigured = (): boolean => {
+  return !!supabaseInstance;
+};
+
+export const getSupabase = (): SupabaseClient => {
+  if (!supabaseInstance) {
+    throw new Error("Supabase não configurado. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.");
+  }
+  return supabaseInstance;
 };
 
 export const getURL = () => {
-  let url = getEnvVar('VITE_SITE_URL') || 'http://localhost:3000/';
+  let url = getEnvVar('VITE_SITE_URL') || window.location.origin;
   url = url.includes('http') ? url : `https://${url}`;
   return url;
 };
