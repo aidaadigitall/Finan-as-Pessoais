@@ -1,23 +1,43 @@
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase';
 
-export async function getCurrentUser() {
-  if (!supabase) return null
-  const { data } = await supabase.auth.getUser()
-  return data.user
-}
+export const authService = {
+  async signUp(email: string, password: string, name: string) {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    
+    if (data.user) {
+      // Criar perfil
+      await supabase.from('profiles').insert({ id: data.user.id, name });
+      
+      // Criar organização padrão
+      const { data: org } = await supabase.from('organizations')
+        .insert({ name: `Minha Empresa`, owner_id: data.user.id, slug: `slug-${Date.now()}` })
+        .select()
+        .single();
+        
+      if (org) {
+        await supabase.from('organization_members').insert({
+          organization_id: org.id,
+          user_id: data.user.id,
+          role: 'owner'
+        });
+      }
+    }
+    return data;
+  },
 
-export async function signIn(email: string, password: string) {
-  if (!supabase) throw new Error("Supabase não configurado")
-  return supabase.auth.signInWithPassword({ email, password })
-}
+  async signIn(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+  },
 
-export async function signUp(email: string, password: string) {
-  if (!supabase) throw new Error("Supabase não configurado")
-  return supabase.auth.signUp({ email, password })
-}
+  async signOut() {
+    await supabase.auth.signOut();
+  },
 
-export async function signOut() {
-  if (!supabase) throw new Error("Supabase não configurado")
-  return supabase.auth.signOut()
-}
-
+  async getSession() {
+    const { data } = await supabase.auth.getSession();
+    return data.session;
+  }
+};

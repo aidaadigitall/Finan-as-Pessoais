@@ -70,8 +70,8 @@ export const exportToPDF = (transactions: Transaction[], accounts: BankAccount[]
         tableRows.push(transactionData);
     });
 
-    // @ts-ignore
-    doc.autoTable({
+    // Cast doc to any to avoid TypeScript errors with autotable plugin injection
+    (doc as any).autoTable({
         startY: 70,
         head: [tableColumn],
         body: tableRows,
@@ -82,7 +82,8 @@ export const exportToPDF = (transactions: Transaction[], accounts: BankAccount[]
     });
 
     // --- Footer ---
-    const pageCount = doc.internal.getNumberOfPages();
+    // Use safe property access via casting to any for robust page count retrieval
+    const pageCount = (doc as any).internal.getNumberOfPages();
     for(let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);

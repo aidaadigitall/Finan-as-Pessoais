@@ -96,8 +96,9 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                 <div className={`w-48 h-48 bg-white p-2 rounded-xl border-2 ${getThemeBorder()} mb-4 flex items-center justify-center`}>
                    <QrCode size={150} className="text-gray-800" />
                 </div>
+                {/* FIX: Escaped > characters with &gt; to prevent build errors */}
                 <p className="text-sm text-gray-500 mb-6 text-center max-w-xs">
-                  Abra o WhatsApp {'>'} Aparelhos Conectados {'>'} Conectar Aparelho e escaneie o código.
+                  Abra o WhatsApp &gt; Aparelhos Conectados &gt; Conectar Aparelho e escaneie o código.
                 </p>
               </div>
             ) : (

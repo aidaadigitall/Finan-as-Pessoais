@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Building2, Users, Palette, Brain, CreditCard, Shield, Save, Plus, Trash2, Mail, Check, X, Upload, Smartphone, ArrowRight } from 'lucide-react';
+import { User, Building2, Users, Palette, Brain, CreditCard, Shield, Save, Plus, Trash2, Mail, Check, X, Upload, Smartphone, ArrowRight, Lightbulb } from 'lucide-react';
 import { ThemeColor, AIRule } from '../types';
 
 interface SettingsProps {
@@ -100,6 +100,11 @@ export const Settings: React.FC<SettingsProps> = ({
           setNewRuleKeyword('');
           setNewRuleCategory('');
       }
+  };
+
+  const fillExampleRule = () => {
+      setNewRuleKeyword('Posto Ipiranga');
+      setNewRuleCategory('Combustível');
   };
 
   // --- Components ---
@@ -358,9 +363,17 @@ export const Settings: React.FC<SettingsProps> = ({
                   </div>
 
                   <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
-                      <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
-                          <Plus size={16} className={`text-${themeColor}-600`} /> Adicionar Nova Regra
-                      </h4>
+                      <div className="flex justify-between items-center mb-4">
+                          <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wider">
+                              <Plus size={16} className={`text-${themeColor}-600`} /> Adicionar Nova Regra
+                          </h4>
+                          <button 
+                              onClick={fillExampleRule}
+                              className={`text-xs flex items-center gap-1 text-${themeColor}-600 hover:text-${themeColor}-700 hover:underline transition font-medium`}
+                          >
+                              <Lightbulb size={14} /> Exemplo Prático
+                          </button>
+                      </div>
                       <div className="flex flex-col md:flex-row gap-4 items-center bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
                           <div className="flex-1 w-full">
                               <span className="text-xs font-bold text-gray-500 mb-1 block uppercase">SE a descrição conter:</span>

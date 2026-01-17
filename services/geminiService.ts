@@ -1,130 +1,9 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { TransactionType, Category, AIRule, Transaction } from "../types";
 
-// Helper to summarize financial data for the AI context
-const generateFinancialContext = (transactions: Transaction[], categories: Category[]) => {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
+import { GoogleGenAI } from "@google/genai";
+import { Transaction, Category, AIRule } from "../types";
 
-  const monthlyTransactions = transactions.filter(t => {
-    const d = new Date(t.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
-
-  const totalIncome = monthlyTransactions
-    .filter(t => t.type === 'income')
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const totalExpense = monthlyTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const balance = totalIncome - totalExpense;
-
-  const expensesByCategory: Record<string, number> = {};
-  monthlyTransactions
-    .filter(t => t.type === 'expense')
-    .forEach(t => {
-      expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount;
-    });
-
-  const overdueTransactions = transactions.filter(t => 
-    t.type === 'expense' && !t.isPaid && t.dueDate && new Date(t.dueDate) < now
-  );
-  
-  const pendingPayables = transactions.filter(t => 
-    t.type === 'expense' && !t.isPaid
-  );
-
-  return `
-    RESUMO FINANCEIRO (Mês Atual):
-    - Receita Total: R$ ${totalIncome.toFixed(2)}
-    - Despesa Total: R$ ${totalExpense.toFixed(2)}
-    - Saldo do Mês: R$ ${balance.toFixed(2)}
-    
-    GASTOS POR CATEGORIA:
-    ${Object.entries(expensesByCategory).map(([cat, val]) => `- ${cat}: R$ ${val.toFixed(2)}`).join('\n')}
-
-    DÍVIDAS:
-    - Atrasadas: ${overdueTransactions.length}
-    - Pendentes: R$ ${pendingPayables.reduce((acc, t) => acc + t.amount, 0).toFixed(2)}
-  `;
-};
-
-const getSystemInstruction = (categories: Category[], userRules: AIRule[]) => {
-  const expenseCategories = categories.filter(c => c.type === 'expense' || c.type === 'both').map(c => c.name).join(', ');
-  const incomeCategories = categories.filter(c => c.type === 'income' || c.type === 'both').map(c => c.name).join(', ');
-  
-  const rulesText = userRules.length > 0 
-    ? `APRENDIZADO HISTÓRICO:\n${userRules.map(r => `- Se contiver "${r.keyword}", CLASSIFIQUE COMO: "${r.category}".`).join('\n')}`
-    : 'Nenhum padrão histórico ainda.';
-
-  return `
-    Você é um assistente financeiro (FinAI). Analise inputs para JSON.
-    
-    PRIORIDADE:
-    1. Regras do Usuário: ${rulesText}
-    2. Padrões de Mercado.
-    3. Inferência.
-
-    CATEGORIAS VÁLIDAS:
-    - Receitas: ${incomeCategories}
-    - Despesas: ${expenseCategories}
-
-    Output JSON Schema:
-    { "isTransaction": boolean, "transactionDetails": { ... }, "responseMessage": string }
-  `;
-};
-
-export const fileToGenerativePart = async (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      const base64Data = base64String.split(',')[1];
-      resolve(base64Data);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
-
-const cleanAndParseJSON = (text: string) => {
-  try {
-    // 1. Remove Markdown code blocks if present (```json ... ```)
-    let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    
-    // 2. Attempt parsing
-    const parsed = JSON.parse(cleanText);
-
-    // 3. Validate Schema Structure
-    if (typeof parsed !== 'object' || parsed === null) {
-        throw new Error("Resposta não é um objeto JSON válido.");
-    }
-
-    // Ensure essential keys exist
-    if (!('isTransaction' in parsed) || !('responseMessage' in parsed)) {
-         // Try to infer if it's a flat object or wrapped differently, but safer to fail gracefully
-         throw new Error("JSON faltando chaves obrigatórias (isTransaction, responseMessage).");
-    }
-
-    // If isTransaction is true, ensure details exist
-    if (parsed.isTransaction && !parsed.transactionDetails) {
-        parsed.isTransaction = false; // Fallback to safe state
-    }
-
-    return parsed;
-  } catch (error) {
-    console.warn("Falha ao parsear JSON da IA:", text, error);
-    // Return a safe fallback object that won't crash the UI
-    return {
-      isTransaction: false,
-      transactionDetails: null,
-      responseMessage: "Desculpe, tive uma pequena confusão interna ao processar os dados. Poderia reformular?"
-    };
-  }
-};
+// The API key must be obtained exclusively from process.env.API_KEY
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeFinancialInput = async (
   textInput: string | null,
@@ -133,64 +12,50 @@ export const analyzeFinancialInput = async (
   userRules: AIRule[] = []
 ) => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const modelId = "gemini-3-flash-preview"; // Using Gemini 3 Flash as per guidelines
     const parts: any[] = [];
-
-    if (mediaFile) {
-      const base64Data = await fileToGenerativePart(mediaFile);
-      parts.push({ inlineData: { mimeType: mediaFile.type, data: base64Data } });
+    if (textInput) {
+      parts.push({ text: textInput });
     }
-
-    if (textInput) parts.push({ text: textInput });
-    else if (!mediaFile) parts.push({ text: "Analise este anexo financeiro." });
-
+    
+    // Gemini 3 Flash is recommended for basic text/structured tasks
     const response = await ai.models.generateContent({
-      model: modelId,
-      contents: { role: 'user', parts: parts },
+      model: 'gemini-3-flash-preview',
+      contents: { parts: parts.length > 0 ? parts : [{ text: "Análise de transação financeira" }] },
       config: {
-        systemInstruction: getSystemInstruction(availableCategories, userRules),
+        systemInstruction: `Você é o FinAI, assistente financeiro. Analise o input e retorne APENAS um JSON: { "isTransaction": boolean, "transactionDetails": { "description": string, "amount": number, "type": "income"|"expense", "category": string }, "responseMessage": string }. Use as categorias: ${JSON.stringify(availableCategories.map(c => c.name))}`,
         responseMimeType: "application/json",
       }
     });
 
-    const responseText = response.text;
-    if (!responseText) throw new Error("Sem resposta da IA");
-    
-    // Use the robust validation helper
-    return cleanAndParseJSON(responseText);
-
+    // Access .text property directly (not a method)
+    return JSON.parse(response.text || "{}");
   } catch (error) {
-    console.error("Erro na análise Gemini:", error);
-    return {
-      isTransaction: false,
-      transactionDetails: null,
-      responseMessage: "Desculpe, serviço temporariamente indisponível. Verifique sua chave de API ou conexão."
-    };
+    console.error("Gemini Error:", error);
+    return { isTransaction: false, responseMessage: "Erro ao processar com IA. Verifique sua conexão e chave de API." };
   }
 };
 
 export const getFinancialAdvice = async (
-  userMessage: string,
+  prompt: string,
   transactions: Transaction[],
   categories: Category[]
 ) => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const modelId = "gemini-3-pro-preview"; // Using Gemini 3 Pro as per guidelines
-
-    const financialContext = generateFinancialContext(transactions, categories);
-    const systemInstruction = `Você é o FinAI Advisor. Contexto:\n${financialContext}`;
-
+    const context = `Histórico recente: ${JSON.stringify(transactions.slice(0, 10))}. Categorias: ${JSON.stringify(categories)}`;
+    
+    // Gemini 3 Pro is recommended for complex reasoning/advice
     const response = await ai.models.generateContent({
-      model: modelId,
-      contents: { role: 'user', parts: [{ text: userMessage }] },
-      config: { systemInstruction: systemInstruction }
+      model: 'gemini-3-pro-preview',
+      contents: [{ text: `${context}\n\nUsuário: ${prompt}` }],
+      config: {
+        systemInstruction: "Você é um consultor financeiro especialista. Forneça insights curtos, práticos e baseados em dados em Português.",
+      }
     });
 
+    // Access .text property directly
     return response.text;
   } catch (error) {
-    console.error("Erro no Consultor Gemini:", error);
-    return "Desculpe, serviço indisponível no momento.";
+    console.error("Advice Error:", error);
+    return "Não foi possível gerar conselhos no momento.";
   }
 };

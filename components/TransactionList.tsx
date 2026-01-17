@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Transaction, TransactionType, Category, RecurrenceFrequency, RecurrenceLabels, BankAccount } from '../types';
-import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText, Bot, User } from 'lucide-react';
 import { exportToPDF, exportToExcel } from '../services/exportService';
 
 interface TransactionListProps {
@@ -20,8 +20,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
   
-  // Expand details state
-  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  // Modal details state
+  const [detailsModalId, setDetailsModalId] = useState<string | null>(null);
 
   // 1. Sort by date desc
   const sorted = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -61,7 +61,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const startEdit = (t: Transaction) => {
     setEditingId(t.id);
     setEditForm({ ...t, recurrence: t.recurrence || 'none' });
-    setExpandedRowId(null);
+    setDetailsModalId(null);
   };
 
   const cancelEdit = () => {
@@ -82,8 +82,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       setEditForm(prev => ({ ...prev, [field]: value }));
   };
   
-  const toggleDetails = (id: string) => {
-      setExpandedRowId(prev => prev === id ? null : id);
+  const openDetails = (id: string) => {
+      setDetailsModalId(id);
+  }
+
+  const closeDetails = () => {
+      setDetailsModalId(null);
   }
   
   const handleReconcile = (t: Transaction) => {
@@ -91,6 +95,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   };
 
   const getAccountName = (id?: string) => accounts.find(a => a.id === id)?.name || 'Conta Padrão';
+  const selectedTransaction = transactions.find(t => t.id === detailsModalId);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -160,11 +165,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           <tbody>
             {filteredTransactions.map((t) => {
               const isEditing = editingId === t.id;
-              const isExpanded = expandedRowId === t.id;
 
               return (
                 <React.Fragment key={t.id}>
-                <tr className={`border-b border-gray-50 dark:border-gray-700 transition-colors ${isEditing || isExpanded ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                <tr className={`border-b border-gray-50 dark:border-gray-700 transition-colors ${isEditing ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
                   {/* Date */}
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                     {new Date(t.date).toLocaleDateString('pt-BR')}
@@ -231,40 +235,167 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                   {/* Actions */}
                   <td className="px-6 py-4 text-center">
                      <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => toggleDetails(t.id)} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full">
+                        <button onClick={() => openDetails(t.id)} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition" title="Ver Detalhes">
                             <Eye size={16} />
                         </button>
-                        <button onClick={() => onToggleStatus(t.id)} className={`p-2 rounded-full ${t.isPaid ? 'text-green-600' : 'text-gray-400 hover:text-green-600'}`}>
+                        <button onClick={() => onToggleStatus(t.id)} className={`p-2 rounded-full transition hover:bg-gray-100 dark:hover:bg-gray-700 ${t.isPaid ? 'text-green-600' : 'text-gray-400 hover:text-green-600'}`} title={t.isPaid ? "Marcar como pendente" : "Marcar como pago"}>
                            <CheckCircle2 size={16} />
                         </button>
                      </div>
                   </td>
                 </tr>
-                {isExpanded && (
-                    <tr className="bg-gray-50 dark:bg-gray-700/30">
-                        <td colSpan={8} className="px-6 py-4">
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                 <div>
-                                     <p className="text-xs font-bold uppercase mb-1">Detalhes</p>
-                                     <p>Fonte: {t.source === 'whatsapp_ai' ? 'IA' : 'Manual'}</p>
-                                     <p>Vencimento: {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '-'}</p>
-                                 </div>
-                                 {t.originalInput && (
-                                     <div>
-                                         <p className="text-xs font-bold uppercase mb-1">Input Original</p>
-                                         <p className="italic">"{t.originalInput}"</p>
-                                     </div>
-                                 )}
-                             </div>
-                        </td>
-                    </tr>
-                )}
                 </React.Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {/* Details Modal */}
+      {selectedTransaction && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col max-h-[90vh]">
+                  
+                  {/* Modal Header */}
+                  <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
+                      <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                          <Info size={18} className="text-indigo-500"/> Detalhes do Lançamento
+                      </h3>
+                      <button onClick={closeDetails} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                          <X size={20} />
+                      </button>
+                  </div>
+
+                  {/* Modal Content */}
+                  <div className="p-6 overflow-y-auto custom-scrollbar space-y-5">
+                      
+                      {/* Amount & Type Badge */}
+                      <div className="flex justify-between items-center">
+                          <div>
+                              <p className="text-xs text-gray-500 uppercase font-bold mb-1">Valor</p>
+                              <p className={`text-2xl font-bold ${selectedTransaction.type === 'income' ? 'text-emerald-600' : selectedTransaction.type === 'expense' ? 'text-red-600' : 'text-blue-600'}`}>
+                                  R$ {selectedTransaction.amount.toFixed(2)}
+                              </p>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${
+                              selectedTransaction.type === 'income' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 
+                              selectedTransaction.type === 'expense' ? 'bg-red-50 text-red-700 border-red-100' : 
+                              'bg-blue-50 text-blue-700 border-blue-100'
+                          }`}>
+                              {selectedTransaction.type === 'income' ? 'Receita' : selectedTransaction.type === 'expense' ? 'Despesa' : 'Transferência'}
+                          </span>
+                      </div>
+
+                      {/* Description & Category */}
+                      <div className="grid grid-cols-1 gap-4">
+                           <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
+                               <p className="text-xs text-gray-400 uppercase font-bold mb-1">Descrição</p>
+                               <p className="font-medium text-gray-800 dark:text-gray-200">{selectedTransaction.description}</p>
+                           </div>
+                           <div className="grid grid-cols-2 gap-4">
+                               <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
+                                   <p className="text-xs text-gray-400 uppercase font-bold mb-1">Categoria</p>
+                                   <div className="flex items-center gap-2">
+                                       <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                       <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">{selectedTransaction.category}</span>
+                                   </div>
+                               </div>
+                               <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
+                                   <p className="text-xs text-gray-400 uppercase font-bold mb-1">Data</p>
+                                   <div className="flex items-center gap-2">
+                                       <Calendar size={14} className="text-gray-400" />
+                                       <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">
+                                           {new Date(selectedTransaction.date).toLocaleDateString('pt-BR')}
+                                       </span>
+                                   </div>
+                               </div>
+                           </div>
+                      </div>
+
+                      {/* Account Info */}
+                      <div>
+                           <p className="text-xs text-gray-500 uppercase font-bold mb-2">Movimentação</p>
+                           <div className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-xl">
+                               <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600">
+                                   <Landmark size={20} />
+                               </div>
+                               <div>
+                                   <p className="text-xs text-gray-400">Conta Bancária</p>
+                                   <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                                       {getAccountName(selectedTransaction.accountId)}
+                                   </p>
+                               </div>
+                               {selectedTransaction.type === TransactionType.TRANSFER && (
+                                   <>
+                                       <ArrowRightLeft size={16} className="text-gray-400" />
+                                       <div>
+                                           <p className="text-xs text-gray-400">Destino</p>
+                                           <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                                               {getAccountName(selectedTransaction.destinationAccountId)}
+                                           </p>
+                                       </div>
+                                   </>
+                               )}
+                           </div>
+                      </div>
+
+                      {/* Source & Metadata */}
+                      <div className="border-t border-gray-100 dark:border-gray-700 pt-4 space-y-3">
+                           <div className="flex justify-between items-center text-sm">
+                               <span className="text-gray-500 flex items-center gap-1"><Bot size={14}/> Fonte</span>
+                               <span className="font-medium text-gray-800 dark:text-gray-200 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                                   {selectedTransaction.source === 'whatsapp_ai' ? 'Inteligência Artificial (WhatsApp)' : 'Manual'}
+                               </span>
+                           </div>
+                           
+                           {selectedTransaction.recurrence && selectedTransaction.recurrence !== 'none' && (
+                               <div className="flex justify-between items-center text-sm">
+                                   <span className="text-gray-500 flex items-center gap-1"><Repeat size={14}/> Recorrência</span>
+                                   <span className="font-medium text-gray-800 dark:text-gray-200">
+                                       {RecurrenceLabels[selectedTransaction.recurrence]}
+                                   </span>
+                               </div>
+                           )}
+
+                           <div className="flex justify-between items-center text-sm">
+                               <span className="text-gray-500 flex items-center gap-1"><CheckCircle2 size={14}/> Status</span>
+                               <span className={`font-bold ${selectedTransaction.isPaid ? 'text-green-600' : 'text-yellow-600'}`}>
+                                   {selectedTransaction.isPaid ? 'Pago / Recebido' : 'Pendente'}
+                               </span>
+                           </div>
+
+                           {selectedTransaction.dueDate && (
+                               <div className="flex justify-between items-center text-sm">
+                                   <span className="text-gray-500 flex items-center gap-1"><Clock size={14}/> Vencimento</span>
+                                   <span className="font-medium text-gray-800 dark:text-gray-200">
+                                       {new Date(selectedTransaction.dueDate).toLocaleDateString('pt-BR')}
+                                   </span>
+                               </div>
+                           )}
+                      </div>
+
+                      {/* Original Input (AI Context) */}
+                      {selectedTransaction.originalInput && (
+                          <div className="mt-4 p-3 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+                              <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1 flex items-center gap-1">
+                                  <Bot size={12} /> Input Original (IA)
+                              </p>
+                              <p className="text-sm italic text-gray-600 dark:text-gray-300">"{selectedTransaction.originalInput}"</p>
+                          </div>
+                      )}
+
+                  </div>
+                  
+                  {/* Modal Footer */}
+                  <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex gap-3">
+                       <button onClick={closeDetails} className="flex-1 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition font-medium">
+                           Fechar
+                       </button>
+                  </div>
+
+              </div>
+          </div>
+      )}
     </div>
   );
 };
