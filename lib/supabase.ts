@@ -1,15 +1,11 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-export let supabase: SupabaseClient | null = null;
-
-if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-} else {
-  console.warn("⚠️ Supabase não configurado. App rodando em modo local.");
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("❌ Variáveis do Supabase não encontradas.")
 }
 
-export const isSupabaseConfigured = !!supabase;
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
