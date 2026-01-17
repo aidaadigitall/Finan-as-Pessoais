@@ -84,7 +84,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
     
-    // Using this.props correctly after adding props to generic
+    // Fixed: Accessed children from this.props which is inherited from React.Component<ErrorBoundaryProps, ErrorBoundaryState>
     return this.props.children;
   }
 }
