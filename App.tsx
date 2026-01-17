@@ -38,49 +38,67 @@ const App: React.FC = () => {
   const [themeColor, setThemeColor] = useState<any>('indigo');
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        if (isSupabaseConfigured() && supabase) {
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
-          if (currentSession) {
-            setSession(currentSession);
-            try {
-              const orgId = await authService.bootstrapUserOrganization(currentSession.user.id, currentSession.user.email);
-              const [transData, accData] = await Promise.all([
-                financialService.getTransactions(orgId),
-                financialService.getBankAccounts(orgId)
-              ]);
-              if (transData) setTransactions(transData);
-              if (accData) setAccounts(accData);
-            } catch (e) {
-              console.error("Erro ao carregar dados organizacionais.");
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Erro na inicialização do App.");
-      } finally {
+    const initSession = async () => {
+      if (!isSupabaseConfigured()) {
         setLoading(false);
+        return;
       }
+
+      // 1. Obter sessão atual
+      const { data: { session: currentSession } } = await supabase!.auth.getSession();
+      setSession(currentSession);
+
+      if (currentSession) {
+        await loadUserData(currentSession);
+      }
+
+      // 2. Escutar mudanças na auth (login/logout)
+      const { data: { subscription } } = supabase!.auth.onAuthStateChange(async (_event, session) => {
+        setSession(session);
+        if (session) await loadUserData(session);
+        setLoading(false);
+      });
+
+      setLoading(false);
+      return () => subscription.unsubscribe();
     };
 
-    init();
+    initSession();
   }, []);
 
+  const loadUserData = async (currentSession: any) => {
+    try {
+      // Bootstrap da organização do usuário
+      const orgId = await authService.bootstrapUserOrganization(
+        currentSession.user.id, 
+        currentSession.user.email
+      );
+      
+      const [transData, accData] = await Promise.all([
+        financialService.getTransactions(orgId),
+        financialService.getBankAccounts(orgId)
+      ]);
+      
+      if (transData) setTransactions(transData);
+      if (accData) setAccounts(accData);
+    } catch (e) {
+      console.error("Erro ao carregar dados do usuário:", e);
+    }
+  };
+
   const handleLogout = async () => {
-    if (supabase) await authService.signOut();
+    await authService.signOut();
     setSession(null);
-    window.location.reload();
   };
 
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-[#0b0e14]">
         <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center animate-bounce shadow-2xl shadow-indigo-500/20">
+            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center animate-bounce shadow-2xl">
                 <Landmark className="text-white" size={32} />
             </div>
-            <p className="text-gray-400 font-medium animate-pulse">Sincronizando com Supabase...</p>
+            <p className="text-gray-400 font-medium animate-pulse">Autenticando...</p>
         </div>
       </div>
     );
@@ -92,24 +110,25 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden font-sans">
+      {/* Sidebar e conteúdo principal permanecem os mesmos, mas usando dados da sessão */}
       <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-6 flex flex-col hidden lg:flex">
         <div className="mb-10 flex items-center gap-3">
-           <div className={`p-2 bg-${themeColor}-600 rounded-lg text-white`}>
+           <div className={`p-2 bg-indigo-600 rounded-lg text-white`}>
              <Landmark size={20} />
            </div>
            <span className="text-xl font-bold dark:text-white">FinAI SaaS</span>
         </div>
         <nav className="flex-1 space-y-1">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <LayoutDashboard size={20} /> <span className="font-medium">Dashboard</span>
           </button>
-          <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'chat' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'chat' ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <MessageSquare size={20} /> <span className="font-medium">Assistente IA</span>
           </button>
-          <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'list' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'list' ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <List size={20} /> <span className="font-medium">Lançamentos</span>
           </button>
-          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? `bg-indigo-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <SettingsIcon size={20} /> <span className="font-medium">Ajustes</span>
           </button>
         </nav>
@@ -124,11 +143,11 @@ const App: React.FC = () => {
         <header className="mb-8 flex justify-between items-center">
            <div>
               <h2 className="text-2xl font-bold dark:text-white">Olá, {session.user.user_metadata?.full_name || session.user.email?.split('@')[0]}</h2>
-              <p className="text-gray-500 text-sm">Gerencie suas finanças com inteligência.</p>
+              <p className="text-gray-500 text-sm">Organização: {session.user.email}</p>
            </div>
            <button 
              onClick={() => setIsTransModalOpen(true)}
-             className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition flex items-center gap-2`}
+             className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition flex items-center gap-2"
            >
              <Plus size={20} /> Novo Lançamento
            </button>
@@ -159,7 +178,7 @@ const App: React.FC = () => {
             <Settings 
               themeColor={themeColor}
               setThemeColor={setThemeColor}
-              userName={session.user.email}
+              userName={session.user.user_metadata?.full_name || session.user.email}
               setUserName={() => {}}
               userPhone=""
               setUserPhone={() => {}}
