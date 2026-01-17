@@ -12,7 +12,8 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fixed generic types <ErrorBoundaryProps, ErrorBoundaryState> to ensure this.state and this.props are recognized by TS
+// Fixed class declaration to explicitly use the generic types <ErrorBoundaryProps, ErrorBoundaryState>
+// This ensures that this.state and this.props are correctly typed and recognized by the TypeScript compiler.
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
