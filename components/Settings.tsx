@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { User, Building2, Users, Palette, Brain, CreditCard, Shield, Save, Plus, Trash2, Mail, Check, X, Upload, Smartphone, ArrowRight, Lightbulb } from 'lucide-react';
+
+import React, { useState, useRef } from 'react';
+import { User, Building2, Users, Palette, Brain, CreditCard, Shield, Save, Plus, Trash2, Mail, Check, X, Upload, Smartphone, ArrowRight, Lightbulb, Image as ImageIcon } from 'lucide-react';
 import { ThemeColor, AIRule } from '../types';
 
 interface SettingsProps {
@@ -15,7 +16,6 @@ interface SettingsProps {
   onResetData: () => void;
 }
 
-// Extensive Color Palette
 const ALL_THEME_COLORS = [
     'slate', 'gray', 'zinc', 'neutral', 'stone',
     'red', 'orange', 'amber', 'yellow', 'lime',
@@ -24,7 +24,6 @@ const ALL_THEME_COLORS = [
     'pink', 'rose'
 ];
 
-// Mock Data Types for UI
 interface TeamMember {
   id: string;
   name: string;
@@ -39,6 +38,7 @@ interface Organization {
   cnpj: string;
   domain: string;
   plan: 'free' | 'starter' | 'pro' | 'enterprise';
+  logoUrl?: string;
 }
 
 export const Settings: React.FC<SettingsProps> = ({
@@ -54,13 +54,14 @@ export const Settings: React.FC<SettingsProps> = ({
   onResetData
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'organization' | 'team' | 'appearance' | 'ai' | 'billing'>('organization');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Local State for Mock Features
   const [org, setOrg] = useState<Organization>({
     name: 'Minha Empresa SaaS',
     cnpj: '00.000.000/0001-91',
     domain: 'minhaempresa.finai.com',
-    plan: 'pro'
+    plan: 'pro',
+    logoUrl: undefined
   });
 
   const [team, setTeam] = useState<TeamMember[]>([
@@ -73,7 +74,16 @@ export const Settings: React.FC<SettingsProps> = ({
   const [newRuleKeyword, setNewRuleKeyword] = useState('');
   const [newRuleCategory, setNewRuleCategory] = useState('');
 
-  // --- Handlers ---
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setOrg(prev => ({ ...prev, logoUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleInviteUser = () => {
     if (!inviteEmail) return;
@@ -107,8 +117,6 @@ export const Settings: React.FC<SettingsProps> = ({
       setNewRuleCategory('Combustível');
   };
 
-  // --- Components ---
-
   const getThemeText = () => `text-${themeColor}-600`;
   const getThemeBg = () => `bg-${themeColor}-600`;
 
@@ -123,8 +131,6 @@ export const Settings: React.FC<SettingsProps> = ({
 
   return (
     <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh-140px)]">
-      
-      {/* Sidebar Navigation */}
       <div className="w-full md:w-64 shrink-0 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
           <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
               <h2 className="font-bold text-gray-700 dark:text-gray-200 text-sm uppercase tracking-wider">Configurações</h2>
@@ -147,37 +153,62 @@ export const Settings: React.FC<SettingsProps> = ({
           </nav>
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-y-auto p-6 md:p-8 custom-scrollbar relative">
           
-          {/* Organization Tab */}
           {activeTab === 'organization' && (
               <div className="space-y-8 animate-in fade-in">
                   <div>
                       <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">Dados da Organização</h3>
-                      <p className="text-gray-500 text-sm">Gerencie a identidade da sua empresa no sistema.</p>
+                      <p className="text-gray-500 text-sm">Gerencie a identidade e branding da sua empresa.</p>
                   </div>
 
-                  <div className="flex items-center gap-6">
-                      <div className="w-24 h-24 rounded-2xl bg-gray-100 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 transition">
-                          <Upload size={24} />
-                          <span className="text-[10px] mt-2">Upload Logo</span>
+                  <div className="flex flex-col md:flex-row items-center gap-8">
+                      <div className="relative group">
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-32 h-32 rounded-3xl bg-gray-100 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 transition overflow-hidden shadow-inner"
+                        >
+                            {org.logoUrl ? (
+                              <img src={org.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                            ) : (
+                              <>
+                                <Upload size={32} />
+                                <span className="text-[10px] mt-2 font-bold uppercase tracking-tighter">Alterar Logo</span>
+                              </>
+                            )}
+                        </div>
+                        <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          className="hidden" 
+                          accept="image/*" 
+                          onChange={handleLogoUpload} 
+                        />
+                        {org.logoUrl && (
+                          <button 
+                            onClick={() => setOrg(prev => ({ ...prev, logoUrl: undefined }))}
+                            className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
-                      <div className="flex-1 space-y-4">
+
+                      <div className="flex-1 w-full space-y-4">
                           <div>
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Nome da Empresa</label>
-                              <input type="text" value={org.name} onChange={e => setOrg({...org, name: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+                              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-widest">Nome Fantasia</label>
+                              <input type="text" value={org.name} onChange={e => setOrg({...org, name: e.target.value})} className="w-full p-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-sm" />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">CNPJ</label>
-                                  <input type="text" value={org.cnpj} onChange={e => setOrg({...org, cnpj: e.target.value})} className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-widest">CNPJ</label>
+                                  <input type="text" value={org.cnpj} onChange={e => setOrg({...org, cnpj: e.target.value})} className="w-full p-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-sm" />
                               </div>
                               <div>
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Domínio Personalizado</label>
-                                  <div className="flex">
-                                      <input type="text" value={org.domain.split('.')[0]} readOnly className="flex-1 p-2.5 rounded-l-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-500 outline-none" />
-                                      <span className="p-2.5 bg-gray-100 dark:bg-gray-700 border border-l-0 border-gray-200 dark:border-gray-600 rounded-r-lg text-gray-500 text-sm flex items-center">.finai.com</span>
+                                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-widest">Domínio SaaS</label>
+                                  <div className="flex shadow-sm rounded-xl overflow-hidden">
+                                      <input type="text" value={org.domain.split('.')[0]} readOnly className="flex-1 p-2.5 bg-gray-50 dark:bg-gray-900 text-gray-500 outline-none border border-r-0 border-gray-200 dark:border-gray-600" />
+                                      <span className="p-2.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-500 text-xs flex items-center font-bold">.finai.com</span>
                                   </div>
                               </div>
                           </div>
@@ -185,14 +216,13 @@ export const Settings: React.FC<SettingsProps> = ({
                   </div>
                   
                   <div className="pt-6 border-t border-gray-100 dark:border-gray-700 flex justify-end">
-                      <button className={`px-6 py-2.5 ${getThemeBg()} text-white rounded-lg hover:opacity-90 transition flex items-center gap-2 font-medium`}>
-                          <Save size={18} /> Salvar Alterações
+                      <button className={`px-6 py-3 ${getThemeBg()} text-white rounded-xl hover:opacity-90 transition flex items-center gap-2 font-bold shadow-lg shadow-indigo-500/20`}>
+                          <Save size={18} /> Salvar Organização
                       </button>
                   </div>
               </div>
           )}
 
-          {/* Team Tab */}
           {activeTab === 'team' && (
               <div className="space-y-8 animate-in fade-in">
                   <div className="flex justify-between items-start">
@@ -205,7 +235,6 @@ export const Settings: React.FC<SettingsProps> = ({
                       </div>
                   </div>
 
-                  {/* Invite Box */}
                   <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 flex gap-3 items-end">
                       <div className="flex-1">
                           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Convidar por E-mail</label>
@@ -229,7 +258,6 @@ export const Settings: React.FC<SettingsProps> = ({
                       </button>
                   </div>
 
-                  {/* Users List */}
                   <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
                       <table className="w-full text-left text-sm text-gray-600 dark:text-gray-300">
                           <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase font-semibold text-gray-500 dark:text-gray-400">
@@ -292,7 +320,6 @@ export const Settings: React.FC<SettingsProps> = ({
               </div>
           )}
 
-          {/* Profile Tab */}
           {activeTab === 'profile' && (
               <div className="space-y-8 animate-in fade-in">
                    <div>
@@ -325,7 +352,6 @@ export const Settings: React.FC<SettingsProps> = ({
               </div>
           )}
 
-          {/* Appearance Tab */}
           {activeTab === 'appearance' && (
               <div className="space-y-8 animate-in fade-in">
                   <div>
@@ -354,7 +380,6 @@ export const Settings: React.FC<SettingsProps> = ({
               </div>
           )}
 
-          {/* AI Rules Tab (Improved Dynamic Layout) */}
           {activeTab === 'ai' && (
               <div className="space-y-8 animate-in fade-in">
                   <div>
@@ -430,7 +455,6 @@ export const Settings: React.FC<SettingsProps> = ({
               </div>
           )}
 
-          {/* Billing Tab */}
           {activeTab === 'billing' && (
                <div className="space-y-8 animate-in fade-in">
                    <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-2xl p-8 relative overflow-hidden shadow-xl">
