@@ -10,6 +10,7 @@ import { ChatInterface } from './components/ChatInterface';
 import { BankAccountManager } from './components/BankAccountManager';
 import { TransactionModal } from './components/TransactionModal';
 import { Settings } from './components/Settings';
+import { Auth } from './components/Auth';
 import { 
   Loader2, 
   LayoutDashboard, 
@@ -98,17 +99,13 @@ const App: React.FC = () => {
 
       if (orgError) throw orgError;
 
-      // Tipagem defensiva: data é um array. Pegamos o primeiro registro.
       const members = data as unknown as OrgMemberResponse[];
 
       if (members && members.length > 0) {
         const organization = members[0].organizations;
         setCurrentOrg(organization);
-        
-        // Carrega dados financeiros vinculados à organização ativa
         await refreshFinancialData(organization.id);
       } else {
-        // Fluxo de primeiro acesso: cria organização padrão
         const newOrg = await authService.createInitialOrg(userId);
         setCurrentOrg(newOrg);
         await refreshFinancialData(newOrg.id);
@@ -136,7 +133,6 @@ const App: React.FC = () => {
     try {
       const saved = await financialService.createTransaction(newTrans, currentOrg.id);
       setTransactions(prev => [saved as any, ...prev]);
-      // Atualiza saldos das contas
       refreshFinancialData(currentOrg.id);
     } catch (e) {
       console.error(e);
@@ -148,7 +144,7 @@ const App: React.FC = () => {
     const trans = transactions.find(t => t.id === id);
     if (!trans || !currentOrg) return;
     try {
-      const updated = await financialService.updateTransaction(id, { is_paid: !trans.isPaid } as any);
+      await financialService.updateTransaction(id, { isPaid: !trans.isPaid } as any);
       setTransactions(prev => prev.map(t => t.id === id ? { ...t, isPaid: !t.isPaid } : t));
     } catch (e) {
       alert("Erro ao atualizar status");
@@ -164,23 +160,7 @@ const App: React.FC = () => {
   }
 
   if (!session) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-[#0f172a] p-4">
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
-          <Landmark className="text-indigo-600 mx-auto mb-6" size={48} />
-          <h1 className="text-2xl font-bold text-center dark:text-white mb-8">FinAI SaaS Login</h1>
-          <button 
-            onClick={() => authService.signIn('demo@finai.com', 'password123')}
-            className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition"
-          >
-            Acessar com Conta Demo
-          </button>
-          <p className="text-center text-gray-500 text-xs mt-6 uppercase tracking-widest font-bold">
-            Ambiente Seguro & Criptografado
-          </p>
-        </div>
-      </div>
-    );
+    return <Auth onAuthSuccess={(s) => setSession(s)} themeColor={themeColor} />;
   }
 
   return (
@@ -188,24 +168,24 @@ const App: React.FC = () => {
       {/* Sidebar - Desktop */}
       <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-6 flex flex-col hidden lg:flex">
         <div className="mb-10 flex items-center gap-3">
-           <Landmark className="text-indigo-600" size={24} />
+           <Landmark className={`text-${themeColor}-600`} size={24} />
            <span className="text-xl font-bold dark:text-white">FinAI SaaS</span>
         </div>
         
         <nav className="flex-1 space-y-1">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <LayoutDashboard size={20} /> <span className="font-medium">Dashboard</span>
           </button>
-          <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'chat' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'chat' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <MessageSquare size={20} /> <span className="font-medium">Assistente IA</span>
           </button>
-          <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'list' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'list' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <List size={20} /> <span className="font-medium">Lançamentos</span>
           </button>
-          <button onClick={() => setActiveTab('accounts')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'accounts' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('accounts')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'accounts' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <Landmark size={20} /> <span className="font-medium">Contas</span>
           </button>
-          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
             <SettingsIcon size={20} /> <span className="font-medium">Ajustes</span>
           </button>
         </nav>
@@ -222,18 +202,18 @@ const App: React.FC = () => {
         <header className="mb-8 flex justify-between items-center">
            <div>
               <h2 className="text-2xl font-bold dark:text-white">Olá, {session.user.email?.split('@')[0]}</h2>
-              <p className="text-gray-500 text-sm">Organização Ativa: <span className="text-indigo-600 font-bold">{currentOrg?.name || 'Carregando...'}</span></p>
+              <p className="text-gray-500 text-sm">Organização Ativa: <span className={`text-${themeColor}-600 font-bold`}>{currentOrg?.name || 'Carregando...'}</span></p>
            </div>
            <button 
              onClick={() => setIsTransModalOpen(true)}
-             className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition flex items-center gap-2"
+             className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition flex items-center gap-2`}
            >
              <Plus size={20} /> Novo Lançamento
            </button>
         </header>
 
         {loadingData ? (
-          <div className="flex justify-center py-12"><Loader2 className="animate-spin text-indigo-500" /></div>
+          <div className="flex justify-center py-12"><Loader2 className={`animate-spin text-${themeColor}-500`} /></div>
         ) : (
           <div className="max-w-7xl mx-auto">
             {activeTab === 'dashboard' && <Dashboard transactions={transactions} themeColor={themeColor} categories={categories} />}
@@ -294,7 +274,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Modais Globais */}
       <TransactionModal 
         isOpen={isTransModalOpen} 
         onClose={() => setIsTransModalOpen(false)} 
