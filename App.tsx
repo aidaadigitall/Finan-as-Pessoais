@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { authService } from './services/authService';
 import { financialService } from './services/financialService';
-import { Transaction, BankAccount, Category, CreditCard as CreditCardType } from './types';
+import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionType } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
 import { ChatInterface } from './components/ChatInterface';
@@ -16,7 +16,6 @@ import { BankAccountManager } from './components/BankAccountManager';
 import { CreditCardManager } from './components/CreditCardManager';
 import { StatementImporter } from './components/StatementImporter';
 import { 
-  Loader2, 
   LayoutDashboard, 
   List, 
   Landmark, 
@@ -47,10 +46,29 @@ const App: React.FC = () => {
   const [isTransModalOpen, setIsTransModalOpen] = useState(false);
   const [themeColor, setThemeColor] = useState<any>('indigo');
 
+  // Load from LocalStorage on mount
+  useEffect(() => {
+    const savedTransactions = localStorage.getItem('finai_transactions');
+    const savedAccounts = localStorage.getItem('finai_accounts');
+    if (savedTransactions) setTransactions(JSON.parse(savedTransactions));
+    if (savedAccounts) setAccounts(JSON.parse(savedAccounts));
+  }, []);
+
+  // Save to LocalStorage whenever data changes
+  useEffect(() => {
+    localStorage.setItem('finai_transactions', JSON.stringify(transactions));
+  }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem('finai_accounts', JSON.stringify(accounts));
+  }, [accounts]);
+
   useEffect(() => {
     const initSession = async () => {
       if (!isSupabaseConfigured()) {
         setLoading(false);
+        // Simulate local session for demo
+        setSession({ user: { email: 'admin@escsistemas.com', user_metadata: { full_name: 'Admin' } } });
         return;
       }
       const { data: { session: currentSession } } = await supabase!.auth.getSession();
@@ -74,21 +92,29 @@ const App: React.FC = () => {
         financialService.getTransactions(orgId),
         financialService.getBankAccounts(orgId)
       ]);
-      if (transData) setTransactions(transData);
-      if (accData) setAccounts(accData);
-      
-      // Mock de cartões para visualização
-      setCreditCards([
-        { id: 'c1', name: 'Nubank Platinum', brand: 'mastercard', limit: 5000, usedLimit: 1200, closingDay: 25, dueDay: 2, color: 'from-purple-600 to-indigo-800', accountId: accData[0]?.id },
-        { id: 'c2', name: 'XP Investimentos', brand: 'visa', limit: 12000, usedLimit: 450, closingDay: 15, dueDay: 22, color: 'from-gray-800 to-black', accountId: accData[0]?.id }
-      ]);
+      if (transData && transData.length > 0) setTransactions(transData);
+      if (accData && accData.length > 0) setAccounts(accData);
     } catch (e) {
-      console.error("Erro ao carregar dados do usuário:", e);
+      console.error("Erro ao carregar dados remotos:", e);
     }
   };
 
+  // Recalculate Current Balances for UI
+  const accountsWithBalances = accounts.map(acc => {
+    const totalIncome = transactions
+      .filter(t => t.accountId === acc.id && t.type === TransactionType.INCOME && t.isPaid)
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalExpense = transactions
+      .filter(t => t.accountId === acc.id && t.type === TransactionType.EXPENSE && t.isPaid)
+      .reduce((sum, t) => sum + t.amount, 0);
+    return {
+      ...acc,
+      currentBalance: acc.initialBalance + totalIncome - totalExpense
+    };
+  });
+
   const handleLogout = async () => {
-    await authService.signOut();
+    if (isSupabaseConfigured()) await authService.signOut();
     setSession(null);
   };
 
@@ -99,7 +125,7 @@ const App: React.FC = () => {
             <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center animate-bounce shadow-2xl">
                 <Landmark className="text-white" size={32} />
             </div>
-            <p className="text-gray-400 font-medium animate-pulse">Autenticando...</p>
+            <p className="text-gray-400 font-medium animate-pulse">Carregando Finanças...</p>
         </div>
       </div>
     );
@@ -170,7 +196,7 @@ const App: React.FC = () => {
             <TransactionList 
               transactions={transactions} 
               categories={categories} 
-              accounts={accounts}
+              accounts={accountsWithBalances}
               onUpdateTransaction={(t) => setTransactions(prev => prev.map(item => item.id === t.id ? t : item))} 
               onToggleStatus={(id) => setTransactions(prev => prev.map(item => item.id === id ? {...item, isPaid: !item.isPaid} : item))} 
             />
@@ -201,7 +227,7 @@ const App: React.FC = () => {
           )}
           {activeTab === 'banks' && (
             <BankAccountManager 
-              accounts={accounts} 
+              accounts={accountsWithBalances} 
               transactions={transactions}
               onAddAccount={(a) => setAccounts(prev => [...prev, a])}
               onUpdateAccount={(a) => setAccounts(prev => prev.map(i => i.id === a.id ? a : i))}
@@ -218,7 +244,7 @@ const App: React.FC = () => {
           )}
           {activeTab === 'reconcile' && (
             <StatementImporter 
-              accounts={accounts}
+              accounts={accountsWithBalances}
               onImport={(newTrans) => setTransactions(prev => [...newTrans, ...prev])}
             />
           )}
@@ -233,7 +259,11 @@ const App: React.FC = () => {
               aiRules={[]}
               onAddAiRule={() => {}}
               onDeleteAiRule={() => {}}
-              onResetData={() => setTransactions([])}
+              onResetData={() => {
+                setTransactions([]);
+                setAccounts([]);
+                localStorage.clear();
+              }}
             />
           )}
         </div>
@@ -244,7 +274,7 @@ const App: React.FC = () => {
         onClose={() => setIsTransModalOpen(false)} 
         onSave={(t) => setTransactions(prev => [t, ...prev])} 
         categories={categories} 
-        accounts={accounts} 
+        accounts={accountsWithBalances} 
         transactions={transactions} 
       />
     </div>
