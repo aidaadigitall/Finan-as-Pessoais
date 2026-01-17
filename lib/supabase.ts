@@ -1,13 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// Safely access env to prevent crashes if not defined
-const env = (import.meta as any).env || {};
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const supabaseUrl = env.VITE_SUPABASE_URL;
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+export let supabase: SupabaseClient | null = null;
 
-// Create a single supabase client for interacting with your database
-// We only initialize if keys are present to prevent crashes during dev without envs
-export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+if (supabaseUrl && supabaseAnonKey) {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+} else {
+  console.warn("⚠️ Supabase não configurado. App rodando em modo local.");
+}
+
+export const isSupabaseConfigured = !!supabase;
+
