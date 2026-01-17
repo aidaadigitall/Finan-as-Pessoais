@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, Category, BankAccount } from '../types';
-import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, Calendar, DollarSign, Tag, Landmark, Save, Target } from 'lucide-react';
+import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, DollarSign, Tag, Landmark, Save, Target } from 'lucide-react';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -8,7 +9,7 @@ interface TransactionModalProps {
   onSave: (transaction: Transaction) => void;
   categories: Category[];
   accounts: BankAccount[];
-  transactions: Transaction[]; // Needed for budget calc
+  transactions: Transaction[]; 
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({ 
@@ -23,7 +24,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [destinationAccountId, setDestinationAccountId] = useState('');
   const [isPaid, setIsPaid] = useState(true);
 
-  // Reset form when opening
   useEffect(() => {
     if (isOpen) {
       setType(TransactionType.EXPENSE);
@@ -37,11 +37,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   }, [isOpen, accounts]);
 
-  // Calculate Budget Progress for selected category
   const getBudgetInfo = () => {
       if (type !== TransactionType.EXPENSE || !categoryId) return null;
       
-      const category = categories.find(c => c.name === categoryId); // ID is Name in this app architecture for simplicity, though ideally should be ID
+      const category = categories.find(c => c.name === categoryId);
       if (!category || !category.budgetLimit) return null;
 
       const now = new Date();
@@ -94,7 +93,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
         <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             
-            {/* Header */}
             <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
                 <h2 className="text-lg font-bold text-gray-800 dark:text-white">Novo Lançamento</h2>
                 <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -102,10 +100,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 </button>
             </div>
 
-            {/* Content */}
             <div className="p-6 overflow-y-auto custom-scrollbar">
-                
-                {/* Type Selector */}
                 <div className="grid grid-cols-3 gap-3 mb-6">
                     <button 
                         onClick={() => setType(TransactionType.INCOME)}
@@ -131,7 +126,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 </div>
 
                 <div className="space-y-4">
-                    {/* Amount & Date Row */}
                     <div className="flex gap-4">
                         <div className="flex-1">
                             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Valor</label>
@@ -143,24 +137,20 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                                     onChange={e => setAmount(e.target.value)}
                                     placeholder="0.00"
                                     className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-lg"
-                                    autoFocus
                                 />
                             </div>
                         </div>
                         <div className="flex-1">
                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Data</label>
-                             <div className="relative">
-                                 <input 
-                                     type="date" 
-                                     value={date}
-                                     onChange={e => setDate(e.target.value)}
-                                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                 />
-                             </div>
+                             <input 
+                                 type="date" 
+                                 value={date}
+                                 onChange={e => setDate(e.target.value)}
+                                 className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                             />
                         </div>
                     </div>
 
-                    {/* Description */}
                     <div>
                         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Descrição</label>
                         <input 
@@ -172,7 +162,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                         />
                     </div>
 
-                    {/* Account Selection */}
                     {type === TransactionType.TRANSFER ? (
                         <div className="grid grid-cols-2 gap-4">
                              <div>
@@ -205,82 +194,71 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                              </div>
                         </div>
                     ) : (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Conta Bancária</label>
-                            <div className="relative">
-                                <Landmark size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <select 
-                                    value={accountId}
-                                    onChange={e => setAccountId(e.target.value)}
-                                    className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                                >
-                                    <option value="" disabled>Selecione a conta</option>
-                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                                </select>
+                        <>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Conta Bancária</label>
+                                <div className="relative">
+                                    <Landmark size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <select 
+                                        value={accountId}
+                                        onChange={e => setAccountId(e.target.value)}
+                                        className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                                    >
+                                        <option value="" disabled>Selecione a conta</option>
+                                        {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                                    </select>
+                                </div>
                             </div>
-                        </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Categoria</label>
+                                <div className="relative">
+                                    <Tag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <select 
+                                        value={categoryId}
+                                        onChange={e => setCategoryId(e.target.value)}
+                                        className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                                    >
+                                        <option value="" disabled>Selecione a categoria</option>
+                                        {categories
+                                            .filter(c => c.type === type || c.type === 'both')
+                                            .map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)
+                                        }
+                                    </select>
+                                </div>
+
+                                {budgetInfo && (
+                                    <div className="mt-2 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700 animate-in fade-in">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                                                <Target size={12} /> Meta de {categoryId}
+                                            </span>
+                                            <span className="text-[10px] text-gray-500">Restam R$ {budgetInfo.remaining.toFixed(2)}</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div 
+                                                className={`h-2 rounded-full transition-all duration-500 ${budgetInfo.percent > 90 ? 'bg-red-500' : budgetInfo.percent > 75 ? 'bg-orange-500' : 'bg-emerald-500'}`}
+                                                style={{ width: `${budgetInfo.percent}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-3 pt-2">
+                                <label className="flex items-center cursor-pointer relative">
+                                    <input type="checkbox" checked={isPaid} onChange={() => setIsPaid(!isPaid)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                                    <span className="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">
+                                        {isPaid ? (type === TransactionType.INCOME ? 'Recebido' : 'Pago') : 'Pendente / Agendado'}
+                                    </span>
+                                </label>
+                            </div>
+                        </>
                     )}
-
-                    {/* Category Selection (Not for transfers) */}
-                    {type !== TransactionType.TRANSFER && (
-                        <div>
-                             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Categoria</label>
-                             <div className="relative">
-                                <Tag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <select 
-                                    value={categoryId}
-                                    onChange={e => setCategoryId(e.target.value)}
-                                    className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                                >
-                                    <option value="" disabled>Selecione a categoria</option>
-                                    {categories
-                                        .filter(c => c.type === type || c.type === 'both')
-                                        .map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)
-                                    }
-                                </select>
-                             </div>
-
-                             {/* Budget Visualizer inside Form */}
-                             {budgetInfo && (
-                                 <div className="mt-2 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700 animate-in fade-in">
-                                     <div className="flex justify-between items-center mb-1">
-                                         <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                                             <Target size={12} /> Meta de {categoryId}
-                                         </span>
-                                         <span className="text-[10px] text-gray-500">Restam R$ {budgetInfo.remaining.toFixed(2)}</span>
-                                     </div>
-                                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                         <div 
-                                            className={`h-2 rounded-full transition-all duration-500 ${budgetInfo.percent > 90 ? 'bg-red-500' : budgetInfo.percent > 75 ? 'bg-orange-500' : 'bg-emerald-500'}`}
-                                            style={{ width: `${budgetInfo.percent}%` }}
-                                         ></div>
-                                     </div>
-                                     <div className="flex justify-between mt-1 text-[10px] text-gray-400">
-                                         <span>Gasto: R$ {budgetInfo.spent.toFixed(0)}</span>
-                                         <span>Limite: R$ {budgetInfo.limit.toFixed(0)}</span>
-                                     </div>
-                                 </div>
-                             )}
-                        </div>
-                    )}
-
-                    {/* Paid/Pending Toggle (Not for transfers) */}
-                    {type !== TransactionType.TRANSFER && (
-                        <div className="flex items-center gap-3 pt-2">
-                            <label className="flex items-center cursor-pointer relative">
-                                <input type="checkbox" checked={isPaid} onChange={() => setIsPaid(!isPaid)} className="sr-only peer" />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
-                                <span className="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">
-                                    {isPaid ? (type === TransactionType.INCOME ? 'Recebido' : 'Pago') : 'Pendente / Agendado'}
-                                </span>
-                            </label>
-                        </div>
-                    )}
-
                 </div>
             </div>
 
-            {/* Footer */}
             <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex gap-3">
                 <button onClick={onClose} className="flex-1 py-3 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition font-medium">Cancelar</button>
                 <button 
@@ -288,10 +266,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     disabled={!amount || !description || !accountId}
                     className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition font-medium flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                    <Save size={18} /> Salvar Lançamento
+                    <Save size={18} /> Salvar
                 </button>
             </div>
-
         </div>
     </div>
   );

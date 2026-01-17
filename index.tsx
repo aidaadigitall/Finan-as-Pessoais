@@ -12,7 +12,7 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Added explicit generic types to the Component class to fix "Property does not exist" errors
+// Fixed generic types <ErrorBoundaryProps, ErrorBoundaryState> to ensure this.state and this.props are recognized by TS
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -31,7 +31,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   render() {
-    // Correctly accessing this.state within the class component
+    // Accessing this.state is now valid with proper generic extension
     const { hasError, error } = this.state;
 
     if (hasError) {
@@ -79,7 +79,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
     
-    // Correctly accessing this.props within the class component
+    // Accessing this.props is now valid with proper generic extension
     return this.props.children;
   }
 }
