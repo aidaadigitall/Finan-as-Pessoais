@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, Category, BankAccount } from '../types';
-import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, DollarSign, Tag, Landmark, Save, Target } from 'lucide-react';
+import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, DollarSign, Tag, Landmark, Save } from 'lucide-react';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -13,7 +13,7 @@ interface TransactionModalProps {
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({ 
-  isOpen, onClose, onSave, categories, accounts, transactions 
+  isOpen, onClose, onSave, categories, accounts 
 }) => {
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [description, setDescription] = useState('');
@@ -37,40 +37,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   }, [isOpen, accounts]);
 
-  const getBudgetInfo = () => {
-      if (type !== TransactionType.EXPENSE || !categoryId) return null;
-      
-      const category = categories.find(c => c.name === categoryId);
-      if (!category || !category.budgetLimit) return null;
-
-      const now = new Date();
-      const spentThisMonth = transactions
-        .filter(t => 
-            t.type === TransactionType.EXPENSE && 
-            t.category === categoryId && 
-            t.isPaid &&
-            new Date(t.date).getMonth() === now.getMonth() &&
-            new Date(t.date).getFullYear() === now.getFullYear()
-        )
-        .reduce((sum, t) => sum + t.amount, 0);
-
-      const percent = Math.min((spentThisMonth / category.budgetLimit) * 100, 100);
-      const remaining = category.budgetLimit - spentThisMonth;
-      
-      return { limit: category.budgetLimit, spent: spentThisMonth, percent, remaining };
-  };
-
-  const budgetInfo = getBudgetInfo();
-
   const handleSave = () => {
       if (!description || !amount || !accountId) return;
       if (type !== TransactionType.TRANSFER && !categoryId) return;
-      if (type === TransactionType.TRANSFER && !destinationAccountId) return;
 
       const newTransaction: Transaction = {
-          id: Date.now().toString(),
+          id: 'temp-' + Date.now(),
           date: new Date(date).toISOString(),
-          dueDate: !isPaid ? new Date(date).toISOString() : undefined,
           description,
           amount: parseFloat(amount),
           type,
@@ -91,183 +64,61 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            
-            <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
-                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Novo Lançamento</h2>
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                    <X size={24} />
-                </button>
+        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Novo Lançamento</h2>
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
 
-            <div className="p-6 overflow-y-auto custom-scrollbar">
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                    <button 
-                        onClick={() => setType(TransactionType.INCOME)}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition ${type === TransactionType.INCOME ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                    >
-                        <ArrowUpCircle size={20} className="mb-1" />
-                        <span className="text-xs font-bold">Receita</span>
-                    </button>
-                    <button 
-                        onClick={() => setType(TransactionType.EXPENSE)}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition ${type === TransactionType.EXPENSE ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                    >
-                        <ArrowDownCircle size={20} className="mb-1" />
-                        <span className="text-xs font-bold">Despesa</span>
-                    </button>
-                    <button 
-                        onClick={() => setType(TransactionType.TRANSFER)}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition ${type === TransactionType.TRANSFER ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                    >
-                        <ArrowRightLeft size={20} className="mb-1" />
-                        <span className="text-xs font-bold">Transferência</span>
-                    </button>
+            <div className="p-8 overflow-y-auto space-y-6">
+                <div className="flex gap-2">
+                    {[TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER].map(t => (
+                        <button key={t} onClick={() => setType(t)} className={`flex-1 py-3 rounded-2xl text-xs font-bold border transition-all ${type === t ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' : 'bg-gray-50 dark:bg-gray-900 border-transparent text-gray-500'}`}>
+                            {t === 'income' ? 'Receita' : t === 'expense' ? 'Despesa' : 'Transf.'}
+                        </button>
+                    ))}
                 </div>
 
                 <div className="space-y-4">
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Valor</label>
-                            <div className="relative">
-                                <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <input 
-                                    type="number" 
-                                    value={amount}
-                                    onChange={e => setAmount(e.target.value)}
-                                    placeholder="0.00"
-                                    className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-lg"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Data</label>
-                             <input 
-                                 type="date" 
-                                 value={date}
-                                 onChange={e => setDate(e.target.value)}
-                                 className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                             />
-                        </div>
+                    <div className="relative">
+                        <DollarSign size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full pl-12 p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white text-2xl font-black outline-none focus:ring-2 focus:ring-indigo-500" />
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Descrição</label>
-                        <input 
-                            type="text" 
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            placeholder={type === TransactionType.TRANSFER ? "Ex: Transferência para Poupança" : "Ex: Compras Supermercado"}
-                            className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
+                    <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição" className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" />
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none" />
+                        <select value={accountId} onChange={e => setAccountId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
+                            <option value="">Selecione a Conta</option>
+                            {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                        </select>
                     </div>
 
-                    {type === TransactionType.TRANSFER ? (
-                        <div className="grid grid-cols-2 gap-4">
-                             <div>
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Origem (Sai)</label>
-                                <div className="relative">
-                                    <Landmark size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                    <select 
-                                        value={accountId}
-                                        onChange={e => setAccountId(e.target.value)}
-                                        className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                                    >
-                                        <option value="" disabled>Selecione</option>
-                                        {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                                    </select>
-                                </div>
-                             </div>
-                             <div>
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Destino (Entra)</label>
-                                <div className="relative">
-                                    <Landmark size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                    <select 
-                                        value={destinationAccountId}
-                                        onChange={e => setDestinationAccountId(e.target.value)}
-                                        className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                                    >
-                                        <option value="" disabled>Selecione</option>
-                                        {accounts.filter(a => a.id !== accountId).map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                                    </select>
-                                </div>
-                             </div>
-                        </div>
-                    ) : (
-                        <>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Conta Bancária</label>
-                                <div className="relative">
-                                    <Landmark size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                    <select 
-                                        value={accountId}
-                                        onChange={e => setAccountId(e.target.value)}
-                                        className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                                    >
-                                        <option value="" disabled>Selecione a conta</option>
-                                        {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Categoria</label>
-                                <div className="relative">
-                                    <Tag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                    <select 
-                                        value={categoryId}
-                                        onChange={e => setCategoryId(e.target.value)}
-                                        className="w-full pl-9 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                                    >
-                                        <option value="" disabled>Selecione a categoria</option>
-                                        {categories
-                                            .filter(c => c.type === type || c.type === 'both')
-                                            .map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)
-                                        }
-                                    </select>
-                                </div>
-
-                                {budgetInfo && (
-                                    <div className="mt-2 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700 animate-in fade-in">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                                                <Target size={12} /> Meta de {categoryId}
-                                            </span>
-                                            <span className="text-[10px] text-gray-500">Restam R$ {budgetInfo.remaining.toFixed(2)}</span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                            <div 
-                                                className={`h-2 rounded-full transition-all duration-500 ${budgetInfo.percent > 90 ? 'bg-red-500' : budgetInfo.percent > 75 ? 'bg-orange-500' : 'bg-emerald-500'}`}
-                                                style={{ width: `${budgetInfo.percent}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-3 pt-2">
-                                <label className="flex items-center cursor-pointer relative">
-                                    <input type="checkbox" checked={isPaid} onChange={() => setIsPaid(!isPaid)} className="sr-only peer" />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
-                                    <span className="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">
-                                        {isPaid ? (type === TransactionType.INCOME ? 'Recebido' : 'Pago') : 'Pendente / Agendado'}
-                                    </span>
-                                </label>
-                            </div>
-                        </>
+                    {type === TransactionType.TRANSFER && (
+                        <select value={destinationAccountId} onChange={e => setDestinationAccountId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
+                            <option value="">Conta de Destino</option>
+                            {accounts.filter(a => a.id !== accountId).map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                        </select>
                     )}
+
+                    {type !== TransactionType.TRANSFER && (
+                        <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
+                            <option value="">Categoria</option>
+                            {categories.filter(c => c.type === type || c.type === 'both').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                    )}
+
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" checked={isPaid} onChange={() => setIsPaid(!isPaid)} className="w-5 h-5 rounded-lg border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Lançamento Efetivado (Pago/Recebido)</span>
+                    </label>
                 </div>
             </div>
 
-            <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex gap-3">
-                <button onClick={onClose} className="flex-1 py-3 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition font-medium">Cancelar</button>
-                <button 
-                    onClick={handleSave}
-                    disabled={!amount || !description || !accountId}
-                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                    <Save size={18} /> Salvar
-                </button>
+            <div className="p-8 bg-gray-50 dark:bg-gray-900/50 flex gap-4">
+                <button onClick={onClose} className="flex-1 py-4 text-gray-500 font-bold">Descartar</button>
+                <button onClick={handleSave} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none">Salvar Lançamento</button>
             </div>
         </div>
     </div>

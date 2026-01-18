@@ -81,7 +81,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
     
-    // Fix: Access children from props using this.props in a class component.
+    // Fix: Children are accessed from this.props now that the class is correctly typed
     return this.props.children || null;
   }
 }
