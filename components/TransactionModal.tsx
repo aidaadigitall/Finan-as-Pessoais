@@ -165,7 +165,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-medium" />
                         </div>
                         <div className="space-y-1">
-                           <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Vencimento (Opcional)</label>
+                           <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Data de Vencimento</label>
                            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-medium text-gray-500" />
                         </div>
                     </div>

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, Category, RecurrenceFrequency, RecurrenceLabels, BankAccount } from '../types';
-import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText, Bot, User, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText, Bot, User, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, CalendarClock } from 'lucide-react';
 import { exportToPDF, exportToExcel } from '../services/exportService';
 
 interface TransactionListProps {
@@ -11,7 +11,7 @@ interface TransactionListProps {
   onUpdateTransaction: (transaction: Transaction) => void;
   onToggleStatus: (id: string) => void;
   onEditTransaction: (transaction: Transaction) => void; 
-  onDeleteTransaction: (id: string) => void; // Nova Prop
+  onDeleteTransaction: (id: string) => void; 
 }
 
 type SortConfig = {
@@ -73,6 +73,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         return 0;
       });
     } else {
+        // Padrão: Mais recente para o mais antigo
         sortableItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
     return sortableItems;
@@ -156,7 +157,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase text-gray-500 dark:text-gray-400 select-none">
             <tr>
               <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => requestSort('date')}>
-                 <div className="flex items-center gap-1">DATA {getSortIcon('date')}</div>
+                 <div className="flex items-center gap-1">DATAS {getSortIcon('date')}</div>
               </th>
               <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => requestSort('description')}>
                  <div className="flex items-center gap-1">DESCRIÇÃO {getSortIcon('description')}</div>
@@ -178,10 +179,23 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             </tr>
           </thead>
           <tbody>
-            {sortedTransactions.map((t) => (
+            {sortedTransactions.map((t) => {
+                const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && !t.isPaid;
+                return (
                 <tr key={t.id} className="border-b border-gray-50 dark:border-gray-700 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    {new Date(t.date).toLocaleDateString('pt-BR')}
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5" title="Data de Lançamento">
+                             <CalendarDays size={12} className="text-indigo-500" />
+                             <span className="font-medium text-gray-700 dark:text-gray-300">{new Date(t.date).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        {t.dueDate && (
+                             <div className={`flex items-center gap-1.5 text-xs ${isOverdue ? 'text-red-500 font-bold' : 'text-gray-400'}`} title="Data de Vencimento">
+                                 <CalendarClock size={12} />
+                                 <span>Venc: {new Date(t.dueDate).toLocaleDateString('pt-BR')}</span>
+                             </div>
+                        )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                     <div className="flex items-center gap-2">
@@ -243,7 +257,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                      </div>
                   </td>
                 </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
@@ -275,6 +289,19 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                           }`}>
                               {selectedTransaction.type === 'income' ? 'Receita' : selectedTransaction.type === 'expense' ? 'Despesa' : 'Transferência'}
                           </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                         <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
+                             <p className="text-xs text-gray-400 uppercase font-bold mb-1">Lançamento</p>
+                             <p className="font-medium text-gray-800 dark:text-gray-200">{new Date(selectedTransaction.date).toLocaleDateString('pt-BR')}</p>
+                         </div>
+                         <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
+                             <p className="text-xs text-gray-400 uppercase font-bold mb-1">Vencimento</p>
+                             <p className="font-medium text-gray-800 dark:text-gray-200">
+                                 {selectedTransaction.dueDate ? new Date(selectedTransaction.dueDate).toLocaleDateString('pt-BR') : '-'}
+                             </p>
+                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 gap-4">
