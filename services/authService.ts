@@ -1,44 +1,55 @@
 
-import { getSupabase, isSupabaseConfigured, getURL } from '../lib/supabase';
+import { getSupabase, getURL } from '../lib/supabase';
 
 export const authService = {
   async signInWithGoogle() {
-    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado");
     const { data, error } = await getSupabase().auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: getURL(),
-      },
+      options: { redirectTo: getURL() },
     });
     if (error) throw error;
     return data;
   },
 
   async signIn(email: string, password: string) {
-    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado");
     const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
   },
 
   async signUp(email: string, password: string) {
-    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado");
     const { data, error } = await getSupabase().auth.signUp({ email, password });
     if (error) throw error;
     return data;
   },
 
   async signOut() {
-    if (!isSupabaseConfigured()) return;
     const { error } = await getSupabase().auth.signOut();
     if (error) throw error;
   },
 
-  async bootstrapUserOrganization(userId: string, email: string) {
-    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado");
-    const client = getSupabase();
+  async getUserSession() {
+    const { data: { session }, error } = await getSupabase().auth.getSession();
+    if (error) throw error;
+    return session;
+  },
+
+  async ensureUserResources(userId: string, email: string) {
+    const supabase = getSupabase();
     
-    const { data: membership } = await client
+    // 1. Verificar perfil
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!profile) {
+      await supabase.from('profiles').insert({ id: userId, email, full_name: email.split('@')[0] });
+    }
+
+    // 2. Verificar organização (tenant)
+    const { data: membership } = await supabase
       .from('organization_members')
       .select('organization_id')
       .eq('user_id', userId)
@@ -46,24 +57,21 @@ export const authService = {
 
     if (membership) return membership.organization_id;
 
+    // 3. Criar nova organização se não existir
     const orgName = `Empresa de ${email.split('@')[0]}`;
-    const slug = `${email.split('@')[0]}-${Math.random().toString(36).substring(7)}`;
-
-    const { data: org, error: orgError } = await client
+    const { data: org, error: orgError } = await supabase
       .from('organizations')
-      .insert({ name: orgName, slug: slug, owner_id: userId })
+      .insert({ name: orgName, owner_id: userId })
       .select()
       .single();
 
     if (orgError) throw orgError;
 
-    await client
-      .from('organization_members')
-      .insert({
-        organization_id: org.id,
-        user_id: userId,
-        role: 'owner'
-      });
+    await supabase.from('organization_members').insert({
+      organization_id: org.id,
+      user_id: userId,
+      role: 'owner'
+    });
 
     return org.id;
   }
