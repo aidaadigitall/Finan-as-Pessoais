@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import { Transaction, BankAccount, TransactionType, TransactionStatus } from '../types';
+import { Transaction, BankAccount, Category, TransactionType, TransactionStatus } from '../types';
 
 export const financialService = {
   async getTransactions(orgId: string): Promise<Transaction[]> {
@@ -10,11 +10,7 @@ export const financialService = {
       .eq('organization_id', orgId)
       .order('date', { ascending: false });
 
-    if (error) {
-      console.error("[FinancialService] Erro ao buscar transações:", error);
-      throw new Error(`Falha ao carregar movimentações: ${error.message}`);
-    }
-
+    if (error) throw error;
     return (data || []).map(t => ({
       id: t.id,
       date: t.date,
@@ -38,11 +34,7 @@ export const financialService = {
       .select('*')
       .eq('organization_id', orgId);
 
-    if (error) {
-      console.error("[FinancialService] Erro ao buscar contas:", error);
-      throw new Error(`Falha ao carregar contas bancárias: ${error.message}`);
-    }
-
+    if (error) throw error;
     return (data || []).map(acc => ({
       id: acc.id,
       name: acc.name,
@@ -54,31 +46,63 @@ export const financialService = {
     }));
   },
 
-  async createTransaction(t: Partial<Transaction>, orgId: string): Promise<Transaction> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Usuário não autenticado");
-
+  async getCategories(orgId: string): Promise<Category[]> {
     const { data, error } = await supabase
-      .from('transactions')
-      .insert({
-        description: t.description,
-        amount: t.amount,
-        type: t.type,
-        category: t.category,
-        date: t.date || new Date().toISOString(),
-        due_date: t.dueDate,
-        is_paid: t.isPaid,
-        account_id: t.accountId,
-        destination_account_id: t.destinationAccountId,
-        organization_id: orgId,
-        user_id: user.id,
-        source: t.source || 'manual',
-        reconciled: t.reconciled || false
-      })
-      .select()
-      .single();
+      .from('categories')
+      .select('*')
+      .eq('organization_id', orgId);
 
     if (error) throw error;
-    return data;
+    return (data || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      parentId: c.parent_id,
+      budgetLimit: c.budget_limit
+    }));
+  },
+
+  async createTransaction(t: Partial<Transaction>, orgId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+
+    const { error } = await supabase.from('transactions').insert({
+      description: t.description,
+      amount: t.amount,
+      type: t.type,
+      category: t.category,
+      date: t.date || new Date().toISOString(),
+      due_date: t.dueDate,
+      is_paid: t.isPaid,
+      account_id: t.accountId,
+      destination_account_id: t.destinationAccountId,
+      organization_id: orgId,
+      user_id: user.id,
+      source: t.source || 'manual'
+    });
+    if (error) throw error;
+  },
+
+  async createBankAccount(acc: Partial<BankAccount>, orgId: string): Promise<void> {
+    const { error } = await supabase.from('bank_accounts').insert({
+      name: acc.name,
+      bank_name: acc.bankName,
+      initial_balance: acc.initialBalance,
+      color: acc.color,
+      organization_id: orgId,
+      current_balance: acc.initialBalance // Inicialmente igual
+    });
+    if (error) throw error;
+  },
+
+  async createCategory(cat: Partial<Category>, orgId: string): Promise<void> {
+    const { error } = await supabase.from('categories').insert({
+      name: cat.name,
+      type: cat.type,
+      parent_id: cat.parentId,
+      budget_limit: cat.budgetLimit,
+      organization_id: orgId
+    });
+    if (error) throw error;
   }
 };
