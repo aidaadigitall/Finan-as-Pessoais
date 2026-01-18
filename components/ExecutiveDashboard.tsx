@@ -21,7 +21,7 @@ interface ExecutiveDashboardProps {
 
 export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ orgId, themeColor }) => {
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<'30' | '90' | '180'>('30');
+  const [period, setPeriod] = useState<string>('30');
   const [data, setData] = useState<{ metrics: DashboardMetrics, dre: DREItem[], transactions: Transaction[] } | null>(null);
 
   const fetchData = async () => {
@@ -116,6 +116,15 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ orgId, t
     </div>
   );
 
+  const filterOptions = [
+      { label: '7D', value: '7' },
+      { label: '15D', value: '15' },
+      { label: '30D', value: '30' },
+      { label: '3M', value: '90' },
+      { label: '6M', value: '180' },
+      { label: '1A', value: '365' },
+  ];
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -123,18 +132,14 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ orgId, t
           <h2 className="text-3xl font-black text-gray-800 dark:text-white tracking-tighter">Cockpit Executivo</h2>
           <p className="text-gray-500 text-sm">Visão estratégica baseada em fluxo de caixa real.</p>
         </div>
-        <div className="flex bg-white dark:bg-gray-800 p-1 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
-          {[
-            { l: '30 Dias', v: '30' },
-            { l: '90 Dias', v: '90' },
-            { l: '6 Meses', v: '180' }
-          ].map(p => (
+        <div className="flex flex-wrap gap-1 bg-white dark:bg-gray-800 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+          {filterOptions.map(p => (
             <button 
-              key={p.v}
-              onClick={() => setPeriod(p.v as any)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${period === p.v ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-900'}`}
+              key={p.value}
+              onClick={() => setPeriod(p.value)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${period === p.value ? `bg-${themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-900'}`}
             >
-              {p.l}
+              {p.label}
             </button>
           ))}
         </div>

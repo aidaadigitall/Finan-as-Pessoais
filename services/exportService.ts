@@ -1,6 +1,6 @@
 
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { Transaction, BankAccount } from '../types';
 
@@ -53,7 +53,7 @@ export const exportToPDF = (transactions: Transaction[], accounts: BankAccount[]
         ]);
     });
 
-    (doc as any).autoTable({
+    autoTable(doc, {
         startY: 70,
         head: [tableColumn],
         body: tableRows,
