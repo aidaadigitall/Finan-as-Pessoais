@@ -3,7 +3,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-  // Fixed: Cast process to any to safely check for cwd() existence in various environments
+  // Carrega variáveis do arquivo .env ou do ambiente (Vercel/GitHub Actions)
   const currentDir = typeof process !== 'undefined' && typeof (process as any).cwd === 'function' 
     ? (process as any).cwd() 
     : '.';
@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Injeta as variáveis reais que você preencheu no painel do GitHub/Vercel
+      // Injeta as variáveis para que fiquem disponíveis em process.env e import.meta.env no bundle final
       'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
       'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
       'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || env.API_KEY),

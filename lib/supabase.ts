@@ -1,9 +1,13 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+/**
+ * Função utilitária para buscar variáveis de ambiente em diferentes contextos.
+ * Essencial para compatibilidade entre ambientes de desenvolvimento e produção (Vercel/SaaS).
+ */
 const getEnvVar = (key: string): string => {
-  // Tenta buscar de todas as formas possíveis de injeção do Vite/SaaS
-  // Adiciona verificação de existência para import.meta e import.meta.env
+  if (typeof window !== 'undefined' && (window as any)._env_?.[key]) return (window as any)._env_[key];
+  
   return (
     (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) || 
     (typeof process !== 'undefined' && process.env && process.env[key]) || 
@@ -12,22 +16,25 @@ const getEnvVar = (key: string): string => {
   );
 };
 
+// Chaves específicas do Supabase
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
 const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-// Singleton para o cliente
+// Singleton para o cliente para evitar múltiplas conexões
 let supabaseInstance: SupabaseClient | null = null;
 
-// Verificação segura do modo de desenvolvimento
+// Verifica modo de desenvolvimento com segurança
 const isDev = typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env as any).DEV;
 
 if (isDev) {
-  console.log("Supabase Init Check:", { 
+  console.log("Supabase Connection Strategy:", { 
     urlFound: !!supabaseUrl, 
-    keyFound: !!supabaseAnonKey 
+    keyFound: !!supabaseAnonKey,
+    strategy: typeof import.meta !== 'undefined' ? 'import.meta' : 'process.env'
   });
 }
 
+// Inicializa apenas se as chaves forem válidas
 if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
   try {
     supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
@@ -38,7 +45,7 @@ if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
       }
     });
   } catch (e) {
-    console.error("Erro ao inicializar Supabase:", e);
+    console.error("Falha crítica na inicialização do Supabase:", e);
   }
 }
 
@@ -50,7 +57,7 @@ export const isSupabaseConfigured = (): boolean => {
 
 export const getSupabase = (): SupabaseClient => {
   if (!supabaseInstance) {
-    throw new Error("Supabase não configurado. Verifique as variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.");
+    throw new Error("Supabase não configurado. Verifique as variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no seu painel de controle.");
   }
   return supabaseInstance;
 };
