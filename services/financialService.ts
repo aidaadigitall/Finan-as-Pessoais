@@ -184,6 +184,14 @@ export const financialService = {
     if (error) throw error;
   },
 
+  async deleteTransaction(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
   async createBankAccount(acc: Partial<BankAccount>, orgId: string): Promise<void> {
     if (!orgId) throw new Error("ID da organização não encontrado");
 

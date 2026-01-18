@@ -212,6 +212,24 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Erro ao salvar: " + e.message); }
   };
 
+  // Implementação da exclusão de transação
+  const handleDeleteTransaction = async (id: string) => {
+      if (!orgId) return;
+      
+      requestConfirmation(
+          "Excluir Lançamento?",
+          "Esta ação é irreversível e removerá o lançamento do seu histórico financeiro.",
+          async () => {
+              try {
+                  await financialService.deleteTransaction(id);
+                  await loadData(orgId);
+              } catch (e: any) { alert("Erro ao excluir lançamento: " + e.message); }
+          },
+          'danger',
+          'Excluir'
+      );
+  }
+
   const handleUpdateTransactionLocal = async (t: Transaction) => {
     setTransactions(prev => prev.map(item => item.id === t.id ? t : item));
   };
@@ -249,10 +267,27 @@ const App: React.FC = () => {
   }
   
   const handleToggleStatus = async (id: string) => {
-      setTransactions(prev => prev.map(t => {
-          if (t.id === id) return { ...t, isPaid: !t.isPaid, status: !t.isPaid ? TransactionStatus.CONFIRMED : TransactionStatus.PENDING_AUDIT };
-          return t;
-      }));
+      const transaction = transactions.find(t => t.id === id);
+      if (!transaction || !orgId) return;
+
+      const updatedTransaction = { 
+          ...transaction, 
+          isPaid: !transaction.isPaid, 
+          status: !transaction.isPaid ? TransactionStatus.CONFIRMED : TransactionStatus.PENDING_AUDIT 
+      };
+
+      // Otimistic Update
+      setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t));
+
+      try {
+          await financialService.updateTransaction(updatedTransaction, orgId);
+          // Opcional: Recarregar dados para garantir consistência total
+          // await loadData(orgId); 
+      } catch (e: any) {
+          // Revert se falhar
+          setTransactions(prev => prev.map(t => t.id === id ? transaction : t));
+          alert("Erro ao atualizar status: " + e.message);
+      }
   };
 
   if (appState === 'BOOTING' || appState === 'LOADING_DATA') return <Loading message="Sincronizando..." />;
@@ -303,7 +338,7 @@ const App: React.FC = () => {
         <div className="p-6 lg:p-10 max-w-7xl mx-auto">
           {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor="indigo" />}
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={categories} />}
-          {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransactionLocal} onToggleStatus={handleToggleStatus} onEditTransaction={handleEditTransaction} />}
+          {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransactionLocal} onToggleStatus={handleToggleStatus} onEditTransaction={handleEditTransaction} onDeleteTransaction={handleDeleteTransaction} />}
           {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}

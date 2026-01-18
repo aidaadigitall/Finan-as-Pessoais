@@ -10,7 +10,8 @@ interface TransactionListProps {
   accounts?: BankAccount[]; 
   onUpdateTransaction: (transaction: Transaction) => void;
   onToggleStatus: (id: string) => void;
-  onEditTransaction: (transaction: Transaction) => void; // Nova Prop
+  onEditTransaction: (transaction: Transaction) => void; 
+  onDeleteTransaction: (id: string) => void; // Nova Prop
 }
 
 type SortConfig = {
@@ -18,7 +19,7 @@ type SortConfig = {
     direction: 'asc' | 'desc';
 } | null;
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, accounts = [], onUpdateTransaction, onToggleStatus, onEditTransaction }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, accounts = [], onUpdateTransaction, onToggleStatus, onEditTransaction, onDeleteTransaction }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -226,7 +227,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                       />
                   </td>
                   <td className="px-6 py-4 text-center">
-                     <div className="flex items-center justify-center gap-2">
+                     <div className="flex items-center justify-center gap-1">
                         <button onClick={() => openDetails(t.id)} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition" title="Ver Detalhes">
                             <Eye size={16} />
                         </button>
@@ -235,6 +236,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                         </button>
                         <button onClick={() => onToggleStatus(t.id)} className={`p-2 rounded-full transition hover:bg-gray-100 dark:hover:bg-gray-700 ${t.isPaid ? 'text-green-600' : 'text-gray-400 hover:text-green-600'}`} title={t.isPaid ? "Marcar como pendente" : "Marcar como pago"}>
                            <CheckCircle2 size={16} />
+                        </button>
+                        <button onClick={() => onDeleteTransaction(t.id)} className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Excluir Lançamento">
+                            <Trash2 size={16} />
                         </button>
                      </div>
                   </td>
