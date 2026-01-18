@@ -1,16 +1,24 @@
 
 import React from 'react';
-import { AlertTriangle, Trash2, X, Check } from 'lucide-react';
+import { AlertTriangle, Trash2, X, Check, Layers } from 'lucide-react';
+
+export interface CustomAction {
+  label: string;
+  onClick: () => void;
+  variant: 'danger' | 'primary' | 'secondary' | 'outline';
+  icon?: React.ElementType;
+}
 
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm?: () => void;
   title: string;
   description: string;
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'info';
+  customActions?: CustomAction[]; // Nova prop para múltiplos botões
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -21,11 +29,22 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   description,
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
-  variant = 'danger'
+  variant = 'danger',
+  customActions
 }) => {
   if (!isOpen) return null;
 
   const isDanger = variant === 'danger';
+
+  const getButtonClass = (btnVariant: string) => {
+      switch(btnVariant) {
+          case 'danger': return 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-500/30';
+          case 'primary': return 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/30';
+          case 'secondary': return 'bg-gray-100 text-gray-700 hover:bg-gray-200';
+          case 'outline': return 'border border-gray-200 text-gray-600 hover:bg-gray-50';
+          default: return 'bg-indigo-600 text-white';
+      }
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -55,25 +74,51 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="p-6 pt-0 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3.5 rounded-xl border border-gray-200 dark:border-gray-700 font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition focus:scale-95"
-          >
-            {cancelText}
-          </button>
-          <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className={`flex-1 py-3.5 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95 hover:opacity-90 ${
-              isDanger ? 'bg-rose-600 shadow-rose-500/30' : 'bg-amber-600 shadow-amber-500/30'
-            }`}
-          >
-            {isDanger && <Trash2 size={16} />}
-            {confirmText}
-          </button>
+        <div className={`p-6 pt-0 ${customActions ? 'flex flex-col gap-3' : 'flex gap-3'}`}>
+          {customActions ? (
+              <>
+                {customActions.map((action, idx) => {
+                    const Icon = action.icon;
+                    return (
+                        <button
+                            key={idx}
+                            onClick={() => { action.onClick(); onClose(); }}
+                            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition transform active:scale-95 shadow-sm ${getButtonClass(action.variant)}`}
+                        >
+                            {Icon && <Icon size={18} />}
+                            {action.label}
+                        </button>
+                    )
+                })}
+                <button
+                    onClick={onClose}
+                    className="w-full py-2.5 rounded-xl text-xs font-bold text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition uppercase tracking-widest"
+                >
+                    {cancelText}
+                </button>
+              </>
+          ) : (
+              <>
+                <button
+                    onClick={onClose}
+                    className="flex-1 py-3.5 rounded-xl border border-gray-200 dark:border-gray-700 font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition focus:scale-95"
+                >
+                    {cancelText}
+                </button>
+                <button
+                    onClick={() => {
+                        onConfirm && onConfirm();
+                        onClose();
+                    }}
+                    className={`flex-1 py-3.5 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95 hover:opacity-90 ${
+                    isDanger ? 'bg-rose-600 shadow-rose-500/30' : 'bg-amber-600 shadow-amber-500/30'
+                    }`}
+                >
+                    {isDanger && <Trash2 size={16} />}
+                    {confirmText}
+                </button>
+              </>
+          )}
         </div>
       </div>
     </div>

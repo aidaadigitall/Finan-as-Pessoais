@@ -15,17 +15,18 @@ import { ChatInterface } from './components/ChatInterface';
 import { Auth } from './components/Auth';
 import { AccountsPayable } from './components/AccountsPayable';
 import { AccountsReceivable } from './components/AccountsReceivable';
-import { ConfirmationModal } from './components/ConfirmationModal';
+import { ConfirmationModal, CustomAction } from './components/ConfirmationModal';
+import { Settings } from './components/Settings';
 
 import { 
   LayoutDashboard, List, Landmark, LogOut, Plus, 
   CreditCard, Tag, MessageSquare, Menu, Loader2, AlertTriangle, RefreshCw, Briefcase,
-  TrendingDown, TrendingUp
+  TrendingDown, TrendingUp, Settings as SettingsIcon, Layers, Trash2
 } from 'lucide-react';
-import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus } from './types';
+import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus, SystemSettings, UserProfile } from './types';
 
 type AppState = 'BOOTING' | 'AUTH_REQUIRED' | 'LOADING_DATA' | 'READY' | 'CRITICAL_ERROR';
-type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'payable' | 'receivable';
+type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'payable' | 'receivable' | 'settings';
 
 interface ConfirmationState {
   isOpen: boolean;
@@ -34,6 +35,7 @@ interface ConfirmationState {
   onConfirm: () => void;
   variant?: 'danger' | 'warning';
   confirmText?: string;
+  customActions?: CustomAction[];
 }
 
 const App: React.FC = () => {
@@ -51,6 +53,21 @@ const App: React.FC = () => {
   
   // Estado para armazenar a transação sendo editada
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
+
+  // Estados Globais de Configuração e Perfil
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>({
+      companyName: 'FinAI',
+      themeColor: 'indigo',
+      whatsapp: { status: 'disconnected' },
+      apiKeys: {}
+  });
+
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+      id: '',
+      name: 'Usuário',
+      email: '',
+      role: 'owner'
+  });
 
   // Estado para o Modal de Confirmação
   const [confirmModal, setConfirmModal] = useState<ConfirmationState>({
@@ -93,6 +110,14 @@ const App: React.FC = () => {
       return;
     }
 
+    // Inicializar Perfil Básico
+    setUserProfile({
+        id: session.user.id,
+        email: session.user.email!,
+        name: session.user.email!.split('@')[0],
+        role: 'owner'
+    });
+
     setAppState('LOADING_DATA');
     try {
       const id = await authService.ensureUserResources(session.user.id, session.user.email!);
@@ -119,7 +144,8 @@ const App: React.FC = () => {
     description: string, 
     action: () => void, 
     variant: 'danger' | 'warning' = 'danger',
-    confirmText: string = 'Confirmar'
+    confirmText: string = 'Confirmar',
+    customActions?: CustomAction[]
   ) => {
     setConfirmModal({
       isOpen: true,
@@ -127,7 +153,8 @@ const App: React.FC = () => {
       description,
       onConfirm: action,
       variant,
-      confirmText
+      confirmText,
+      customActions
     });
   };
 
@@ -212,10 +239,50 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Erro ao salvar: " + e.message); }
   };
 
-  // Implementação da exclusão de transação
+  // Implementação da exclusão de transação (Com Suporte a Parcelamento)
   const handleDeleteTransaction = async (id: string) => {
       if (!orgId) return;
       
+      const transaction = transactions.find(t => t.id === id);
+      if (!transaction) return;
+
+      // Se for parcelado, pergunta especial
+      if (transaction.installmentId) {
+          requestConfirmation(
+              "Excluir Parcelamento",
+              "Este lançamento faz parte de uma série parcelada. Como deseja prosseguir?",
+              () => {}, // Callback default ignorado por causa das customActions
+              'warning',
+              '',
+              [
+                  {
+                      label: "Excluir APENAS esta parcela",
+                      variant: 'secondary',
+                      icon: Trash2,
+                      onClick: async () => {
+                          try {
+                              await financialService.deleteTransaction(id);
+                              await loadData(orgId);
+                          } catch (e: any) { alert("Erro: " + e.message); }
+                      }
+                  },
+                  {
+                      label: "Excluir TODAS as parcelas",
+                      variant: 'danger',
+                      icon: Layers,
+                      onClick: async () => {
+                          try {
+                              await financialService.deleteInstallmentSeries(transaction.installmentId!);
+                              await loadData(orgId);
+                          } catch (e: any) { alert("Erro: " + e.message); }
+                      }
+                  }
+              ]
+          );
+          return;
+      }
+
+      // Exclusão normal
       requestConfirmation(
           "Excluir Lançamento?",
           "Esta ação é irreversível e removerá o lançamento do seu histórico financeiro.",
@@ -258,7 +325,7 @@ const App: React.FC = () => {
         "Excluir Categoria?",
         "As transações vinculadas a esta categoria não serão excluídas, mas ficarão sem categoria definida.",
         async () => {
-            // Implementação futura no service
+             // Lógica de exclusão aqui
              setCategories(prev => prev.filter(c => c.id !== id));
         },
         'warning',
@@ -276,15 +343,11 @@ const App: React.FC = () => {
           status: !transaction.isPaid ? TransactionStatus.CONFIRMED : TransactionStatus.PENDING_AUDIT 
       };
 
-      // Otimistic Update
       setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t));
 
       try {
           await financialService.updateTransaction(updatedTransaction, orgId);
-          // Opcional: Recarregar dados para garantir consistência total
-          // await loadData(orgId); 
       } catch (e: any) {
-          // Revert se falhar
           setTransactions(prev => prev.map(t => t.id === id ? transaction : t));
           alert("Erro ao atualizar status: " + e.message);
       }
@@ -292,12 +355,20 @@ const App: React.FC = () => {
 
   if (appState === 'BOOTING' || appState === 'LOADING_DATA') return <Loading message="Sincronizando..." />;
   if (appState === 'CRITICAL_ERROR') return <ErrorScreen error={errorDetails} onRetry={initialize} />;
-  if (appState === 'AUTH_REQUIRED') return <Auth onAuthSuccess={initialize} themeColor="indigo" />;
+  
+  if (appState === 'AUTH_REQUIRED') return (
+     <Auth 
+        onAuthSuccess={initialize} 
+        themeColor={systemSettings.themeColor} 
+        companyName={systemSettings.companyName}
+        logoUrl={systemSettings.loginLogoUrl}
+     />
+  );
 
   const NavItem = ({ icon: Icon, label, view }: any) => (
     <button 
       onClick={() => { setCurrentView(view); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === view ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentView === view ? `bg-${systemSettings.themeColor}-600 text-white shadow-lg` : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
     >
       <Icon size={18} /> <span className="text-sm">{label}</span>
     </button>
@@ -307,10 +378,20 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] overflow-hidden">
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#151a21] border-r border-gray-100 dark:border-gray-800 p-6 flex flex-col transition-transform lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-10 flex items-center gap-3">
-          <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-xl"><LayoutDashboard size={24}/></div>
-          <span className="font-black text-xl tracking-tight dark:text-white">FinAI <span className="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded ml-1">PRO</span></span>
+          {systemSettings.logoUrl ? (
+              <img src={systemSettings.logoUrl} alt="Logo" className="h-10 w-auto object-contain" />
+          ) : (
+              <div className={`p-2 bg-${systemSettings.themeColor}-600 rounded-xl text-white shadow-xl`}>
+                  <LayoutDashboard size={24}/>
+              </div>
+          )}
+          <span className="font-black text-xl tracking-tight dark:text-white truncate">
+             {systemSettings.companyName}
+             <span className={`text-[10px] bg-${systemSettings.themeColor}-500 text-white px-2 py-0.5 rounded ml-1`}>PRO</span>
+          </span>
         </div>
-        <nav className="flex-1 space-y-1">
+
+        <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon={Briefcase} label="Cockpit Executivo" view="executive" />
           <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />
           <NavItem icon={List} label="Movimentações" view="transactions" />
@@ -323,28 +404,56 @@ const App: React.FC = () => {
           <NavItem icon={Tag} label="Categorias" view="categories" />
           <NavItem icon={MessageSquare} label="Assistente IA" view="chat" />
         </nav>
-        <button onClick={() => authService.signOut()} className="flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl"><LogOut size={18} /> Sair</button>
+        
+        <div className="pt-4 border-t border-gray-100 dark:border-gray-800 mt-2 space-y-1">
+             <NavItem icon={SettingsIcon} label="Configurações" view="settings" />
+             <button onClick={() => authService.signOut()} className="w-full flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl"><LogOut size={18} /> Sair</button>
+        </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto bg-[#f8fafc] dark:bg-[#0b0e14]">
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#151a21]/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
           <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 text-gray-500"><Menu size={22} /></button>
-          <div className="flex-1 px-4"></div>
-          <button onClick={openNewTransactionModal} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-xl flex items-center gap-2 transition-all active:scale-95">
-            <Plus size={20}/> Novo Lançamento
-          </button>
+          
+          <div className="flex-1 px-4 flex justify-end items-center gap-4">
+               {/* User Info Header */}
+               <div className="flex items-center gap-3">
+                   <div className="text-right hidden md:block">
+                       <p className="text-sm font-bold text-gray-800 dark:text-white">{userProfile.name}</p>
+                       <p className="text-xs text-gray-500">{userProfile.role === 'owner' ? 'Administrador' : 'Colaborador'}</p>
+                   </div>
+                   <div className={`w-10 h-10 rounded-full bg-${systemSettings.themeColor}-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm`}>
+                       {userProfile.avatarUrl ? <img src={userProfile.avatarUrl} alt="User" className="w-full h-full object-cover"/> : <span className={`text-${systemSettings.themeColor}-600 font-bold`}>{userProfile.name.charAt(0)}</span>}
+                   </div>
+               </div>
+          </div>
+          
+          {currentView !== 'settings' && (
+              <button onClick={openNewTransactionModal} className={`ml-4 bg-${systemSettings.themeColor}-600 text-white px-6 py-3 rounded-2xl font-black shadow-xl flex items-center gap-2 transition-all active:scale-95`}>
+                  <Plus size={20}/> <span className="hidden sm:inline">Novo Lançamento</span>
+              </button>
+          )}
         </header>
 
         <div className="p-6 lg:p-10 max-w-7xl mx-auto">
-          {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor="indigo" />}
-          {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={categories} />}
+          {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor={systemSettings.themeColor} />}
+          {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor={systemSettings.themeColor} categories={categories} />}
           {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransactionLocal} onToggleStatus={handleToggleStatus} onEditTransaction={handleEditTransaction} onDeleteTransaction={handleDeleteTransaction} />}
           {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
-          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransactionLocal} onUpdateCard={handleUpdateCard} />}
+          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransactionLocal} onUpdateCard={handleUpdateCard} themeColor={systemSettings.themeColor} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={handleDeleteCategory} />}
-          {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor="indigo" transactions={transactions} />}
+          {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor={systemSettings.themeColor} transactions={transactions} />}
+          
+          {currentView === 'settings' && (
+              <Settings 
+                settings={systemSettings} 
+                onUpdateSettings={setSystemSettings}
+                userProfile={userProfile}
+                onUpdateProfile={setUserProfile}
+              />
+          )}
         </div>
       </main>
       
@@ -367,6 +476,7 @@ const App: React.FC = () => {
         description={confirmModal.description}
         variant={confirmModal.variant}
         confirmText={confirmModal.confirmText}
+        customActions={confirmModal.customActions}
       />
     </div>
   );

@@ -1,16 +1,18 @@
 
 import React, { useState } from 'react';
 import { authService } from '../services/authService';
-import { Landmark, Mail, Lock, Loader2, ArrowRight, Info } from 'lucide-react';
+import { Landmark, Loader2, Info } from 'lucide-react';
 import { ThemeColor } from '../types';
 import { isConfigured } from '../lib/supabase';
 
 interface AuthProps {
   onAuthSuccess: (session: any) => void;
   themeColor: ThemeColor;
+  companyName?: string;
+  logoUrl?: string;
 }
 
-export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
+export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor, companyName = "FinAI", logoUrl }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -53,14 +55,20 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0b0e14] relative overflow-hidden p-4">
-      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-indigo-600/10 rounded-full blur-[120px] animate-pulse"></div>
+      <div className={`absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-${themeColor}-600/10 rounded-full blur-[120px] animate-pulse`}></div>
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-10">
-          <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[2rem] flex items-center justify-center text-white mx-auto shadow-2xl mb-6">
-            <Landmark size={40} />
-          </div>
-          <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">FinAI <span className="text-indigo-500/80">SaaS</span></h1>
+          {logoUrl ? (
+             <div className="w-24 h-24 mx-auto mb-6 bg-white/5 rounded-[2rem] p-4 backdrop-blur-sm shadow-2xl border border-white/10 flex items-center justify-center">
+                 <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+             </div>
+          ) : (
+             <div className={`w-20 h-20 bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-700 rounded-[2rem] flex items-center justify-center text-white mx-auto shadow-2xl mb-6`}>
+               <Landmark size={40} />
+             </div>
+          )}
+          <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">{companyName} <span className={`text-${themeColor}-500/80`}>SaaS</span></h1>
           <p className="text-gray-400 font-medium">Gestão financeira profissional</p>
         </div>
 
@@ -94,7 +102,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="bg-indigo-500/10 border border-indigo-500/50 text-indigo-400 text-xs p-3 rounded-xl">
+                <div className={`bg-${themeColor}-500/10 border border-${themeColor}-500/50 text-${themeColor}-400 text-xs p-3 rounded-xl`}>
                   {error}
                 </div>
               )}
@@ -104,7 +112,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                className={`w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/50`}
                 placeholder="email@empresa.com"
               />
 
@@ -113,14 +121,14 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                className={`w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/50`}
                 placeholder="Senha"
               />
 
               <button 
                 type="submit"
                 disabled={loading || !configured}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className={`w-full py-3 bg-${themeColor}-600 hover:bg-${themeColor}-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
               >
                 {loading ? <Loader2 className="animate-spin" size={20} /> : (isLogin ? 'Entrar' : 'Cadastrar')}
               </button>

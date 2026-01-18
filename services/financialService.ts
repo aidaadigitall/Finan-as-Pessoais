@@ -192,6 +192,16 @@ export const financialService = {
     if (error) throw error;
   },
 
+  // Novo método para excluir todas as parcelas
+  async deleteInstallmentSeries(installmentId: string): Promise<void> {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('installment_id', installmentId);
+      
+      if (error) throw error;
+  },
+
   async createBankAccount(acc: Partial<BankAccount>, orgId: string): Promise<void> {
     if (!orgId) throw new Error("ID da organização não encontrado");
 

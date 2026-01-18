@@ -106,3 +106,29 @@ export interface WhatsAppConfig {
   phoneNumber?: string;
   instanceId?: string;
 }
+
+export interface ApiKeysConfig {
+  openai?: string;
+  gemini?: string;
+  anthropic?: string;
+  copilot?: string;
+  grok?: string;
+  deepseek?: string;
+}
+
+export interface SystemSettings {
+  companyName: string;
+  logoUrl?: string; // Logo interna (Dashboard)
+  loginLogoUrl?: string; // Logo externa (Login)
+  themeColor: ThemeColor;
+  apiKeys: ApiKeysConfig;
+  whatsapp: WhatsAppConfig;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  role: 'owner' | 'admin' | 'viewer';
+}
