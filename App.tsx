@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, isConfigured } from './lib/supabase';
 import { authService } from './services/authService';
 import { financialService } from './services/financialService';
-import { offlineService } from './services/offlineService'; // Para persistência das regras
+import { offlineService } from './services/offlineService';
+import { settingsService } from './services/settingsService'; // Novo serviço
 
 import { ExecutiveDashboard } from './components/ExecutiveDashboard';
 import { Dashboard } from './components/Dashboard';
@@ -52,10 +53,8 @@ const App: React.FC = () => {
   const [cards, setCards] = useState<CreditCardType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Estado para armazenar a transação sendo editada
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
 
-  // Estados Globais de Configuração e Perfil
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
       companyName: 'FinAI',
       themeColor: 'indigo',
@@ -70,10 +69,8 @@ const App: React.FC = () => {
       role: 'owner'
   });
 
-  // Estado das Regras de IA
   const [userRules, setUserRules] = useState<AIRule[]>([]);
 
-  // Estado para o Modal de Confirmação
   const [confirmModal, setConfirmModal] = useState<ConfirmationState>({
     isOpen: false,
     title: '',
@@ -81,20 +78,50 @@ const App: React.FC = () => {
     onConfirm: () => {}
   });
 
+  // Função centralizada para atualizar configurações (Estado + DB + LocalStorage)
+  const handleUpdateSettings = async (newSettings: SystemSettings) => {
+      // 1. Atualiza UI imediatamente
+      setSystemSettings(newSettings);
+      
+      // 2. Sincroniza chaves no LocalStorage para o GeminiService funcionar
+      if (newSettings.apiKeys?.gemini) localStorage.setItem('finai_api_key_gemini', newSettings.apiKeys.gemini);
+      if (newSettings.apiKeys?.openai) localStorage.setItem('finai_api_key_openai', newSettings.apiKeys.openai);
+
+      // 3. Persiste no Banco de Dados
+      if (orgId) {
+          try {
+              await settingsService.updateSettings(orgId, newSettings);
+          } catch (error) {
+              console.error("Falha ao salvar configurações na nuvem:", error);
+              // Não bloqueamos a UI, apenas logamos o erro (poderia ter um toast aqui)
+          }
+      }
+  };
+
   const loadData = useCallback(async (id: string) => {
     try {
-      const [t, a, c, crd] = await Promise.all([
+      const [t, a, c, crd, settings] = await Promise.all([
         financialService.getTransactions(id),
         financialService.getBankAccounts(id),
         financialService.getCategories(id),
-        financialService.getCreditCards(id)
+        financialService.getCreditCards(id),
+        settingsService.getSettings(id) // Carrega configurações do DB
       ]);
       setTransactions(t);
       setAccounts(a);
       setCategories(c);
       setCards(crd);
       
-      // Carregar Regras Locais (simulando backend)
+      // Aplica configurações carregadas
+      if (settings) {
+          const mergedSettings = { ...systemSettings, ...settings };
+          setSystemSettings(mergedSettings as SystemSettings);
+          
+          // Restaura chaves do banco para o LocalStorage (Auto-login nas APIs)
+          if (mergedSettings.apiKeys?.gemini) localStorage.setItem('finai_api_key_gemini', mergedSettings.apiKeys.gemini);
+          if (mergedSettings.apiKeys?.openai) localStorage.setItem('finai_api_key_openai', mergedSettings.apiKeys.openai);
+      }
+      
       const savedRules = offlineService.get<AIRule[]>('ai_rules', []);
       setUserRules(savedRules);
 
@@ -123,7 +150,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Inicializar Perfil Básico
     setUserProfile({
         id: session.user.id,
         email: session.user.email!,
@@ -151,7 +177,6 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [initialize]);
 
-  // Helper para abrir confirmação
   const requestConfirmation = (
     title: string, 
     description: string, 
@@ -241,30 +266,26 @@ const App: React.FC = () => {
     if (!orgId) return;
     try {
       if (transactionToEdit) {
-         // Edição
          await financialService.updateTransaction(t, orgId);
       } else {
-         // Novo
          await financialService.createTransaction(t, orgId);
       }
       await loadData(orgId);
-      setTransactionToEdit(null); // Reseta após salvar
+      setTransactionToEdit(null);
     } catch (e: any) { alert("Erro ao salvar: " + e.message); }
   };
 
-  // Implementação da exclusão de transação (Com Suporte a Parcelamento)
   const handleDeleteTransaction = async (id: string) => {
       if (!orgId) return;
       
       const transaction = transactions.find(t => t.id === id);
       if (!transaction) return;
 
-      // Se for parcelado, pergunta especial
       if (transaction.installmentId) {
           requestConfirmation(
               "Excluir Parcelamento",
               "Este lançamento faz parte de uma série parcelada. Como deseja prosseguir?",
-              () => {}, // Callback default ignorado por causa das customActions
+              () => {},
               'warning',
               '',
               [
@@ -295,7 +316,6 @@ const App: React.FC = () => {
           return;
       }
 
-      // Exclusão normal
       requestConfirmation(
           "Excluir Lançamento?",
           "Esta ação é irreversível e removerá o lançamento do seu histórico financeiro.",
@@ -338,7 +358,6 @@ const App: React.FC = () => {
         "Excluir Categoria?",
         "As transações vinculadas a esta categoria não serão excluídas, mas ficarão sem categoria definida.",
         async () => {
-             // Lógica de exclusão aqui
              setCategories(prev => prev.filter(c => c.id !== id));
         },
         'warning',
@@ -429,7 +448,6 @@ const App: React.FC = () => {
           <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 text-gray-500"><Menu size={22} /></button>
           
           <div className="flex-1 px-4 flex justify-end items-center gap-4">
-               {/* User Info Header */}
                <div className="flex items-center gap-3">
                    <div className="text-right hidden md:block">
                        <p className="text-sm font-bold text-gray-800 dark:text-white">{userProfile.name}</p>
@@ -458,7 +476,6 @@ const App: React.FC = () => {
           {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransactionLocal} onUpdateCard={handleUpdateCard} themeColor={systemSettings.themeColor} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={handleDeleteCategory} />}
           
-          {/* Passing updated AI Rules and Rules Updater to ChatInterface and Settings */}
           {currentView === 'chat' && (
               <ChatInterface 
                   onAddTransaction={handleSaveTransaction} 
@@ -473,7 +490,7 @@ const App: React.FC = () => {
           {currentView === 'settings' && (
               <Settings 
                 settings={systemSettings} 
-                onUpdateSettings={setSystemSettings}
+                onUpdateSettings={handleUpdateSettings} // Usa o novo handler centralizado
                 userProfile={userProfile}
                 onUpdateProfile={setUserProfile}
                 userRules={userRules}
@@ -484,7 +501,6 @@ const App: React.FC = () => {
         </div>
       </main>
       
-      {/* Modais Globais */}
       <TransactionModal 
          isOpen={isModalOpen} 
          onClose={() => setIsModalOpen(false)} 

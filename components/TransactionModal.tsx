@@ -64,6 +64,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setCategoryId('');
         setAccountId(accounts.length > 0 ? accounts[0].id : '');
         setCreditCardId('');
+        setDestinationAccountId(''); // Garante reset
         setOriginType('account');
         setIsPaid(true);
         setIsInstallment(false);
@@ -87,8 +88,19 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     return result;
   }, [categories, type]);
 
+  const handleTypeChange = (newType: TransactionType) => {
+      setType(newType);
+      if (newType !== TransactionType.EXPENSE) setOriginType('account');
+      // Reset destination account when switching away from TRANSFER or TO transfer to enforce selection
+      if (newType !== TransactionType.TRANSFER) setDestinationAccountId(''); 
+  };
+
   const handleSave = () => {
       if (!description || !amount) return;
+      if (type === TransactionType.TRANSFER && !destinationAccountId) {
+          alert("Selecione a conta de destino para a transferência.");
+          return;
+      }
       
       const selectedCat = categories.find(c => c.id === categoryId);
       const parsedAmount = parseFloat(amount);
@@ -140,7 +152,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             <div className="p-8 overflow-y-auto space-y-6 custom-scrollbar">
                 <div className="flex gap-2">
                     {[TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER].map(t => (
-                        <button key={t} onClick={() => { setType(t); if(t !== TransactionType.EXPENSE) setOriginType('account'); }} className={`flex-1 py-3 rounded-2xl text-xs font-bold border transition-all ${type === t ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-gray-50 dark:bg-gray-900 border-transparent text-gray-500'}`}>
+                        <button key={t} onClick={() => handleTypeChange(t)} className={`flex-1 py-3 rounded-2xl text-xs font-bold border transition-all ${type === t ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-gray-50 dark:bg-gray-900 border-transparent text-gray-500'}`}>
                             {t === 'income' ? 'Receita' : t === 'expense' ? 'Despesa' : 'Transf.'}
                         </button>
                     ))}
@@ -232,7 +244,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
                     {type === TransactionType.TRANSFER && (
                         <select value={destinationAccountId} onChange={e => setDestinationAccountId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
-                            <option value="">Conta de Destino</option>
+                            <option value="">Conta de Destino (Obrigatório)</option>
                             {accounts.filter(a => a.id !== accountId).map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                         </select>
                     )}
