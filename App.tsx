@@ -11,6 +11,7 @@ import { financialEngine } from './services/financialEngine';
 
 import { ConnectionGuard } from './components/ConnectionGuard';
 import { Auth } from './components/Auth';
+import { ExecutiveDashboard } from './components/ExecutiveDashboard'; // Importação do novo dashboard
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
 import { TransactionModal } from './components/TransactionModal';
@@ -34,19 +35,20 @@ import {
   Menu,
   X,
   Sparkles,
-  Heart
+  Heart,
+  Briefcase
 } from 'lucide-react';
 import { Transaction, BankAccount, Category, CreditCard as CreditCardType, ThemeColor, AIRule } from './types';
 
 type AppState = 'BOOTING' | 'READY' | 'OFFLINE_ERROR';
-type View = 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'settings';
+type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'settings';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('BOOTING');
   const [session, setSession] = useState<any>(null);
   const [isDemoMode, setIsDemoMode] = useState(() => !isConfigured || offlineService.get('demo_mode', false));
   const [orgId, setOrgId] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<View>(() => offlineService.get('last_view', 'dashboard'));
+  const [currentView, setCurrentView] = useState<View>(() => offlineService.get('last_view', 'executive'));
   const [themeColor, setThemeColor] = useState<ThemeColor>(() => offlineService.get('theme_color', 'indigo'));
   const [userName, setUserName] = useState(() => offlineService.get('user_name', 'Usuário'));
   const [userPhone, setUserPhone] = useState(() => offlineService.get('user_phone', ''));
@@ -173,7 +175,6 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] overflow-hidden font-sans">
       <ConnectionGuard isOnline={appState === 'READY'} isDemoMode={isDemoMode} onRetry={() => { setIsDemoMode(false); initialize(); }} onContinueOffline={() => setIsDemoMode(true)} />
 
-      {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
@@ -193,7 +194,8 @@ const App: React.FC = () => {
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"><X size={20} /></button>
         </div>
         <nav className="flex-1 space-y-1">
-          <NavItem icon={LayoutDashboard} label="Visão Geral" view="dashboard" />
+          <NavItem icon={Briefcase} label="Cockpit Executivo" view="executive" />
+          <NavItem icon={LayoutDashboard} label="Análise de Categorias" view="dashboard" />
           <NavItem icon={List} label="Movimentações" view="transactions" />
           <NavItem icon={Landmark} label="Minhas Contas" view="accounts" />
           <NavItem icon={CreditCard} label="Cartões de Crédito" view="cards" />
@@ -232,6 +234,7 @@ const App: React.FC = () => {
         </header>
 
         <div className="p-6 lg:p-10 max-w-7xl mx-auto">
+          {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor={themeColor} />}
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor={themeColor} categories={categories} />}
           {currentView === 'transactions' && (
             <TransactionList transactions={transactions} categories={categories} accounts={accountsWithComputedBalances} 

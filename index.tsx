@@ -13,7 +13,7 @@ interface ErrorBoundaryState {
 }
 
 // Fixed class definition by ensuring it extends React.Component with <ErrorBoundaryProps, ErrorBoundaryState>
-// This ensures that this.state and this.props are correctly typed and accessible.
+// This ensures that this.state and this.props are correctly typed and accessible in a class component.
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
