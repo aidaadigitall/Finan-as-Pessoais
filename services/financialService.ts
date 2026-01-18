@@ -2,6 +2,12 @@
 import { supabase } from '../lib/supabase';
 import { Transaction, BankAccount, Category, TransactionType, TransactionStatus, CreditCard } from '../types';
 
+// Helper para evitar enviar strings vazias para campos UUID
+const sanitizeId = (id: string | undefined | null) => {
+  if (!id || id === 'undefined' || (typeof id === 'string' && id.trim() === '')) return null;
+  return id;
+};
+
 export const financialService = {
   async getTransactions(orgId: string): Promise<Transaction[]> {
     try {
@@ -121,6 +127,7 @@ export const financialService = {
         const currentDate = new Date(baseDate);
         currentDate.setMonth(baseDate.getMonth() + i);
         
+        // Ajuste para fim de mês (ex: 31 de jan -> 28 de fev)
         if (currentDate.getDate() !== baseDate.getDate()) {
             currentDate.setDate(0);
         }
@@ -135,9 +142,9 @@ export const financialService = {
             date: currentDate.toISOString(),
             due_date: t.dueDate ? new Date(new Date(t.dueDate).setMonth(new Date(t.dueDate).getMonth() + i)).toISOString() : currentDate.toISOString(),
             is_paid: isPaid,
-            account_id: t.accountId,
-            destination_account_id: t.destinationAccountId,
-            credit_card_id: t.creditCardId,
+            account_id: sanitizeId(t.accountId),
+            destination_account_id: sanitizeId(t.destinationAccountId),
+            credit_card_id: sanitizeId(t.creditCardId),
             organization_id: orgId,
             user_id: user.id,
             source: t.source || 'manual',
@@ -176,7 +183,7 @@ export const financialService = {
     const { error } = await supabase.from('categories').insert({
       name: cat.name,
       type: cat.type,
-      parent_id: cat.parentId && !cat.parentId.startsWith('temp-') ? cat.parentId : null,
+      parent_id: sanitizeId(cat.parentId) && !cat.parentId?.startsWith('temp-') ? cat.parentId : null,
       budget_limit: cat.budgetLimit || 0,
       organization_id: orgId,
       user_id: user?.id
@@ -190,11 +197,11 @@ export const financialService = {
       .insert({
         name: card.name,
         brand: card.brand,
-        "limit": card.limit, // Quote limit as it is a reserved word sometimes
+        "limit": card.limit, 
         closing_day: card.closingDay,
         due_day: card.dueDay,
         color: card.color,
-        account_id: card.accountId || null, // Ensure empty string becomes null
+        account_id: sanitizeId(card.accountId),
         organization_id: orgId
       });
     
@@ -211,7 +218,7 @@ export const financialService = {
         closing_day: card.closingDay,
         due_day: card.dueDay,
         color: card.color,
-        account_id: card.accountId || null
+        account_id: sanitizeId(card.accountId)
       })
       .eq('id', card.id)
       .eq('organization_id', orgId);
