@@ -3,8 +3,6 @@ import { supabase } from '../lib/supabase';
 import { Transaction, BankAccount, Category, TransactionType, TransactionStatus, CreditCard } from '../types';
 
 export const financialService = {
-  // ... (métodos anteriores mantidos)
-
   async getTransactions(orgId: string): Promise<Transaction[]> {
     try {
       const { data, error } = await supabase
@@ -27,7 +25,7 @@ export const financialService = {
         source: t.source,
         accountId: t.account_id,
         destinationAccountId: t.destination_account_id,
-        creditCardId: t.credit_card_id,
+        credit_card_id: t.credit_card_id,
         reconciled: t.reconciled
       }));
     } catch (e) {
@@ -47,7 +45,7 @@ export const financialService = {
       return (data || []).map(acc => ({
         id: acc.id,
         name: acc.name,
-        bankName: acc.bank_name,
+        bankName: acc.bank_name || acc.name, // Fallback caso a coluna falhe
         initialBalance: Number(acc.initial_balance),
         currentBalance: Number(acc.current_balance),
         color: acc.color,
@@ -103,15 +101,26 @@ export const financialService = {
   },
 
   async createBankAccount(acc: Partial<BankAccount>, orgId: string): Promise<void> {
-    const { error } = await supabase.from('bank_accounts').insert({
+    // Verificamos se orgId está presente
+    if (!orgId) throw new Error("ID da organização não encontrado");
+
+    const payload = {
       name: acc.name,
-      bank_name: acc.bankName,
-      initial_balance: acc.initialBalance,
-      color: acc.color,
-      organization_id: orgId,
-      current_balance: acc.initialBalance
-    });
-    if (error) throw error;
+      bank_name: acc.bankName, // Certifique-se que no SQL do Supabase a coluna é bank_name
+      initial_balance: acc.initialBalance || 0,
+      current_balance: acc.initialBalance || 0,
+      color: acc.color || 'indigo',
+      organization_id: orgId
+    };
+
+    const { error } = await supabase
+      .from('bank_accounts')
+      .insert(payload);
+
+    if (error) {
+      console.error("Erro detalhado Supabase (bank_accounts):", error);
+      throw new Error(`Erro ao criar conta: ${error.message}`);
+    }
   },
 
   async createCategory(cat: Partial<Category>, orgId: string): Promise<void> {
