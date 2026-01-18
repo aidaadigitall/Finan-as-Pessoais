@@ -32,7 +32,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   render() {
-    // Accessing this.state defined via Component generics
+    // Accessing this.state which is now correctly inherited from Component
     const { hasError, error } = this.state;
 
     if (hasError) {
@@ -86,7 +86,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
     
-    // Accessing this.props defined via Component generics
+    // Accessing this.props which is now correctly inherited from Component
     return this.props.children;
   }
 }

@@ -48,10 +48,10 @@ const App: React.FC = () => {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>(() => offlineService.get('last_view', 'dashboard'));
   const [themeColor, setThemeColor] = useState<ThemeColor>(() => offlineService.get('theme_color', 'indigo'));
-  const [userName, setUserName] = useState(() => offlineService.get('user_name', 'Amigo(a)'));
+  const [userName, setUserName] = useState(() => offlineService.get('user_name', 'Usuário'));
   const [userPhone, setUserPhone] = useState(() => offlineService.get('user_phone', ''));
   const [aiRules, setAiRules] = useState<AIRule[]>(() => offlineService.get('ai_rules', []));
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => offlineService.get('transactions', []));
   const [accounts, setAccounts] = useState<BankAccount[]>(() => offlineService.get('accounts', []));
@@ -173,7 +173,15 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] overflow-hidden font-sans">
       <ConnectionGuard isOnline={appState === 'READY'} isDemoMode={isDemoMode} onRetry={() => { setIsDemoMode(false); initialize(); }} onContinueOffline={() => setIsDemoMode(true)} />
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#151a21] border-r border-gray-100 dark:border-gray-800 p-6 flex flex-col transition-all duration-500 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full shadow-none'}`}>
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#151a21] border-r border-gray-100 dark:border-gray-800 p-6 flex flex-col transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-10 flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
             <div className={`p-2 bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-700 rounded-xl text-white shadow-xl`}><PieChart size={24}/></div>
@@ -182,7 +190,7 @@ const App: React.FC = () => {
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 block">Gestão Inteligente</span>
             </div>
           </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 p-2 hover:bg-gray-100 rounded-full transition"><X size={20} /></button>
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"><X size={20} /></button>
         </div>
         <nav className="flex-1 space-y-1">
           <NavItem icon={LayoutDashboard} label="Visão Geral" view="dashboard" />
@@ -205,13 +213,16 @@ const App: React.FC = () => {
       </aside>
 
       <main className="flex-1 overflow-y-auto relative bg-[#f8fafc] dark:bg-[#0b0e14]">
-        <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#151a21]/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center transition-all duration-300">
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#151a21]/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-400 transition transform active:rotate-180">
+            <button 
+              onClick={() => setIsSidebarOpen(true)} 
+              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-500 transition-all ${isSidebarOpen ? 'lg:opacity-0 pointer-events-none' : 'opacity-100'}`}
+            >
               <Menu size={22} />
             </button>
-            <div className="hidden sm:block">
-              <h2 className="text-sm font-black text-gray-400 uppercase tracking-[0.2em]">{getGreeting()}, <span className={`text-${themeColor}-600 dark:text-${themeColor}-400`}>{userName}</span></h2>
+            <div>
+              <h2 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">{getGreeting()}, <span className={`text-${themeColor}-600 dark:text-${themeColor}-400`}>{userName}</span></h2>
             </div>
           </div>
           <button onClick={() => setIsModalOpen(true)} className={`group relative bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-6 py-3 rounded-2xl font-black shadow-xl shadow-${themeColor}-600/20 flex items-center gap-2 transition-all active:scale-95 overflow-hidden`}>
@@ -274,7 +285,6 @@ const LoadingScreen = () => {
 
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-[#0b0e14] text-white p-6 relative overflow-hidden">
-      {/* Decorative Blur */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse"></div>
       
       <div className="relative flex flex-col items-center gap-8 text-center animate-in fade-in duration-1000">
