@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase, supabaseHealthCheck, isConfigured } from './lib/supabase';
+import { supabase, isConfigured } from './lib/supabase';
 import { authService } from './services/authService';
 import { financialService } from './services/financialService';
 
@@ -18,7 +18,7 @@ import {
   LayoutDashboard, List, Landmark, LogOut, Plus, 
   CreditCard, Tag, MessageSquare, Menu, Loader2, AlertTriangle, RefreshCw, Briefcase
 } from 'lucide-react';
-import { Transaction, BankAccount, Category, ThemeColor } from './types';
+import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus } from './types';
 
 type AppState = 'BOOTING' | 'AUTH_REQUIRED' | 'LOADING_DATA' | 'READY' | 'CRITICAL_ERROR';
 type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat';
@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [cards, setCards] = useState<CreditCardType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const loadData = useCallback(async (id: string) => {
@@ -45,6 +46,13 @@ const App: React.FC = () => {
       setTransactions(t);
       setAccounts(a);
       setCategories(c);
+      
+      // Simulação de cartões (pode ser expandido para o financialService se houver tabela)
+      const mockCards: CreditCardType[] = [
+        { id: 'card-1', name: 'Nubank Gold', brand: 'mastercard', limit: 5000, usedLimit: 0, closingDay: 5, dueDay: 12, color: 'indigo', accountId: a[0]?.id || '' }
+      ];
+      setCards(mockCards);
+      
       setAppState('READY');
     } catch (e: any) {
       setErrorDetails(e.message);
@@ -85,7 +93,6 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [initialize]);
 
-  // Funções de Ação com Persistência Real
   const handleAddAccount = async (acc: BankAccount) => {
     if (!orgId) return;
     try {
@@ -102,6 +109,11 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Erro ao salvar: " + e.message); }
   };
 
+  const handleUpdateTransaction = async (t: Transaction) => {
+    // Implementação simplificada de update
+    setTransactions(prev => prev.map(item => item.id === t.id ? t : item));
+  };
+
   const handleAddCategory = async (cat: Category) => {
     if (!orgId) return;
     try {
@@ -110,13 +122,9 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Erro ao criar categoria: " + e.message); }
   };
 
-  if (appState === 'BOOTING' || appState === 'LOADING_DATA') return <Loading message="Sincronizando com a nuvem..." />;
+  if (appState === 'BOOTING' || appState === 'LOADING_DATA') return <Loading message="Sincronizando..." />;
   if (appState === 'CRITICAL_ERROR') return <ErrorScreen error={errorDetails} onRetry={initialize} />;
   if (appState === 'AUTH_REQUIRED') return <Auth onAuthSuccess={initialize} themeColor="indigo" />;
-
-  const handleLogout = async () => {
-    await authService.signOut();
-  };
 
   const NavItem = ({ icon: Icon, label, view }: any) => (
     <button 
@@ -136,22 +144,21 @@ const App: React.FC = () => {
         </div>
         <nav className="flex-1 space-y-1">
           <NavItem icon={Briefcase} label="Cockpit Executivo" view="executive" />
-          <NavItem icon={LayoutDashboard} label="Análise Operacional" view="dashboard" />
+          <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />
           <NavItem icon={List} label="Movimentações" view="transactions" />
-          <NavItem icon={Landmark} label="Minhas Contas" view="accounts" />
+          <NavItem icon={Landmark} label="Contas" view="accounts" />
           <NavItem icon={CreditCard} label="Cartões de Crédito" view="cards" />
           <NavItem icon={Tag} label="Categorias" view="categories" />
-          <div className="my-6 border-t border-gray-100 dark:border-gray-800 opacity-30"></div>
           <NavItem icon={MessageSquare} label="Assistente IA" view="chat" />
         </nav>
-        <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-all"><LogOut size={18} /> Encerrar Sessão</button>
+        <button onClick={() => authService.signOut()} className="flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl"><LogOut size={18} /> Sair</button>
       </aside>
 
       <main className="flex-1 overflow-y-auto bg-[#f8fafc] dark:bg-[#0b0e14]">
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#151a21]/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
           <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 text-gray-500"><Menu size={22} /></button>
-          <div className="flex-1 px-4"><span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/> Produção Online</span></div>
-          <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-black shadow-xl flex items-center gap-2 transition-all active:scale-95">
+          <div className="flex-1 px-4"></div>
+          <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-xl flex items-center gap-2 transition-all active:scale-95">
             <Plus size={20}/> Novo Lançamento
           </button>
         </header>
@@ -159,13 +166,14 @@ const App: React.FC = () => {
         <div className="p-6 lg:p-10 max-w-7xl mx-auto">
           {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor="indigo" />}
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={categories} />}
-          {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={()=>{}} onToggleStatus={()=>{}} />}
+          {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransaction} onToggleStatus={()=>{}} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={()=>{}} onDeleteAccount={()=>{}} />}
+          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={(c) => setCards([...cards, c])} onDeleteCard={(id) => setCards(cards.filter(c => c.id !== id))} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransaction} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={()=>{}} />}
           {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor="indigo" transactions={transactions} />}
         </div>
       </main>
-      <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveTransaction} categories={categories} accounts={accounts} cards={[]} />
+      <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveTransaction} categories={categories} accounts={accounts} cards={cards} />
     </div>
   );
 };
@@ -179,13 +187,11 @@ const Loading = ({ message }: any) => (
 
 const ErrorScreen = ({ error, onRetry }: any) => (
   <div className="h-screen flex items-center justify-center bg-[#0b0e14] p-6">
-    <div className="max-w-md w-full bg-[#151a21] rounded-[2.5rem] p-10 border border-red-500/30 text-center">
-      <div className="w-20 h-20 bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500 shadow-2xl shadow-red-500/20">
-        <AlertTriangle size={40} />
-      </div>
-      <h2 className="text-2xl font-black text-white mb-2">Erro Crítico</h2>
-      <p className="text-sm text-gray-400 mb-8 leading-relaxed">{error || "Falha na comunicação com o servidor."}</p>
-      <button onClick={onRetry} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-xl flex items-center justify-center gap-3 transition-all"><RefreshCw size={20} /> Tentar Novamente</button>
+    <div className="max-w-md w-full bg-[#151a21] rounded-[2.5rem] p-10 border border-red-500/30 text-center text-white">
+      <AlertTriangle size={40} className="mx-auto mb-6 text-red-500" />
+      <h2 className="text-2xl font-black mb-2">Erro Crítico</h2>
+      <p className="text-sm text-gray-400 mb-8">{error}</p>
+      <button onClick={onRetry} className="w-full py-4 bg-indigo-600 rounded-2xl font-black shadow-xl flex items-center justify-center gap-3"><RefreshCw size={20} /> Tentar Novamente</button>
     </div>
   </div>
 );
