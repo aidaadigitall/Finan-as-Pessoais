@@ -113,13 +113,18 @@ export const financialService = {
   },
 
   async createCategory(cat: Partial<Category>, orgId: string): Promise<void> {
+    // IMPORTANTE: Removemos o ID temporário do frontend para o Supabase gerar um UUID válido
     const { error } = await supabase.from('categories').insert({
       name: cat.name,
       type: cat.type,
-      parent_id: cat.parentId,
-      budget_limit: cat.budgetLimit,
+      parent_id: cat.parentId && !cat.parentId.startsWith('temp-') ? cat.parentId : null,
+      budget_limit: cat.budgetLimit || 0,
       organization_id: orgId
     });
-    if (error) throw error;
+    
+    if (error) {
+      console.error("Supabase Category Error:", error);
+      throw error;
+    }
   }
 };
