@@ -12,16 +12,12 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fix: explicitly define props and state types in the class generic to allow access to this.props and this.state
+// Fix: Correctly extend Component with generics to ensure 'this.props' is typed.
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState = {
+  state: ErrorBoundaryState = {
     hasError: false,
     error: null
   };
-
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-  }
 
   static getDerivedStateFromError(error: any): ErrorBoundaryState {
     return { hasError: true, error };
@@ -85,7 +81,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
     
-    // Fix: Access children from props correctly. In Class Components, this is accessed via this.props
+    // Fix: Access children from props correctly.
     return this.props.children || null;
   }
 }

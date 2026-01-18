@@ -5,6 +5,7 @@ import { authService } from './services/authService';
 import { financialService } from './services/financialService';
 import { bankAccountsService } from './services/bankAccountsService';
 import { transactionsService } from './services/transactionsService';
+import { offlineService } from './services/offlineService';
 
 import { ConnectionGuard } from './components/ConnectionGuard';
 import { Auth } from './components/Auth';
@@ -44,16 +45,16 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [themeColor, setThemeColor] = useState<ThemeColor>('indigo');
 
-  // Centralized State
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [categories, setCategories] = useState<Category[]>([
+  // Centralized State - Carregando do cache inicial
+  const [transactions, setTransactions] = useState<Transaction[]>(() => offlineService.get('transactions', []));
+  const [accounts, setAccounts] = useState<BankAccount[]>(() => offlineService.get('accounts', []));
+  const [categories, setCategories] = useState<Category[]>(() => offlineService.get('categories', [
     { id: '1', name: 'Alimentação', type: 'expense' },
     { id: '2', name: 'Moradia', type: 'expense' },
     { id: '3', name: 'Salário', type: 'income' },
     { id: '4', name: 'Transporte', type: 'expense' }
-  ]);
-  const [cards, setCards] = useState<CreditCardType[]>([]);
+  ]));
+  const [cards, setCards] = useState<CreditCardType[]>(() => offlineService.get('cards', []));
   
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -66,13 +67,13 @@ const App: React.FC = () => {
       setTransactions(t);
       setAccounts(a);
     } catch (e) {
-      console.error('Falha ao carregar dados:', e);
+      console.error('Falha ao carregar dados remotos:', e);
     }
   }, []);
 
   const initialize = useCallback(async (retry = false) => {
     setAppState('BOOTING');
-    const online = await testSupabaseConnection(5000);
+    const online = await testSupabaseConnection(4000);
     
     if (!online && !isDemoMode && !retry) {
       setAppState('OFFLINE_ERROR');
@@ -91,6 +92,7 @@ const App: React.FC = () => {
       setAppState('READY');
     } catch (e) {
       setAppState('READY');
+      setIsDemoMode(true);
     }
   }, [isDemoMode, fetchData]);
 
@@ -103,20 +105,52 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [initialize]);
 
+  // Persistência local automática sempre que o estado mudar
+  useEffect(() => {
+    offlineService.save('transactions', transactions);
+  }, [transactions]);
+
+  useEffect(() => {
+    offlineService.save('accounts', accounts);
+  }, [accounts]);
+
+  useEffect(() => {
+    offlineService.save('categories', categories);
+  }, [categories]);
+
+  useEffect(() => {
+    offlineService.save('cards', cards);
+  }, [cards]);
+
   const handleAddTransaction = async (t: Transaction) => {
-    if (orgId) {
-      await financialService.syncTransaction(t, orgId);
-      await fetchData(orgId);
-    } else {
-      setTransactions([t, ...transactions]);
+    // 1. Atualizar UI imediatamente (Optimistic UI)
+    setTransactions(prev => [t, ...prev]);
+    
+    // 2. Tentar sincronizar
+    try {
+      if (orgId) {
+        const saved = await financialService.syncTransaction(t, orgId);
+        // Atualizar o item temporário com os dados reais se necessário
+        setTransactions(prev => prev.map(item => item.id === t.id ? saved : item));
+      } else {
+        // Se sem orgId, apenas garante que está no offlineService
+        financialService.syncTransaction(t, "");
+      }
+    } catch (e) {
+      console.error("Falha na sincronização, transação mantida localmente.");
     }
   };
 
   const handleToggleStatus = async (id: string) => {
-    const t = transactions.find(x => x.id === id);
-    if (!t) return;
-    await transactionsService.updateStatus(id, !t.isPaid);
-    if (orgId) fetchData(orgId);
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, isPaid: !t.isPaid } : t));
+    
+    if (orgId) {
+      const t = transactions.find(x => x.id === id);
+      if (t) {
+        await transactionsService.updateStatus(id, !t.isPaid);
+        fetchData(orgId);
+      }
+    }
   };
 
   if (appState === 'BOOTING') return <LoadingScreen />;
@@ -145,7 +179,6 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden font-sans">
       <ConnectionGuard isOnline={appState === 'READY'} isDemoMode={isDemoMode} onRetry={() => { setIsDemoMode(false); initialize(); }} onContinueOffline={() => setIsDemoMode(true)} />
 
-      {/* Sidebar Principal */}
       <aside className="w-72 bg-white dark:bg-[#1c2128] border-r border-gray-200 dark:border-gray-800 p-6 hidden lg:flex flex-col z-40">
         <div className="mb-10 flex items-center gap-3 px-2">
           <div className={`p-2 bg-${themeColor}-600 rounded-xl text-white shadow-lg`}><PieChart size={24}/></div>
@@ -169,7 +202,7 @@ const App: React.FC = () => {
 
         <div className="mt-auto pt-6 border-t border-gray-100 dark:border-gray-800">
            <button 
-            onClick={() => authService.signOut()} 
+            onClick={() => { authService.signOut(); setSession(null); setIsDemoMode(false); }} 
             className="w-full flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors"
            >
             <LogOut size={20}/> Sair do SaaS
@@ -177,9 +210,7 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      {/* Área de Conteúdo */}
       <main className="flex-1 overflow-y-auto relative bg-[#f8fafc] dark:bg-[#0b0e14]">
-        {/* Top Header Floating */}
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#1c2128]/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-8 py-4 flex justify-between items-center">
           <div className="lg:hidden flex items-center gap-3">
              <div className={`p-1.5 bg-${themeColor}-600 rounded-lg text-white`}><PieChart size={18}/></div>
@@ -204,6 +235,7 @@ const App: React.FC = () => {
               categories={categories} 
               accounts={accounts} 
               onUpdateTransaction={async (t) => {
+                setTransactions(prev => prev.map(item => item.id === t.id ? t : item));
                 if(orgId) { await transactionsService.create(t, orgId); fetchData(orgId); }
               }} 
               onToggleStatus={handleToggleStatus} 
@@ -213,9 +245,17 @@ const App: React.FC = () => {
             <BankAccountManager 
               accounts={accounts} 
               transactions={transactions} 
-              onAddAccount={async (a) => { if(orgId) { await bankAccountsService.create(a, orgId); fetchData(orgId); }}} 
-              onUpdateAccount={() => {}} 
-              onDeleteAccount={async (id) => { await bankAccountsService.delete(id); if(orgId) fetchData(orgId); }} 
+              onAddAccount={async (a) => {
+                setAccounts(prev => [...prev, a]);
+                if(orgId) { await bankAccountsService.create(a, orgId); fetchData(orgId); }
+              }} 
+              onUpdateAccount={(a) => {
+                setAccounts(prev => prev.map(item => item.id === a.id ? a : item));
+              }} 
+              onDeleteAccount={async (id) => {
+                setAccounts(prev => prev.filter(a => a.id !== id));
+                if(orgId) { await bankAccountsService.delete(id); fetchData(orgId); }
+              }} 
             />
           )}
           {currentView === 'cards' && (
@@ -264,7 +304,7 @@ const App: React.FC = () => {
               aiRules={[]} 
               onAddAiRule={() => {}} 
               onDeleteAiRule={() => {}} 
-              onResetData={() => {}} 
+              onResetData={() => { offlineService.clearAll(); window.location.reload(); }} 
             />
           )}
         </div>
@@ -273,14 +313,7 @@ const App: React.FC = () => {
       <TransactionModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        onSave={async (t) => {
-          if (orgId) {
-            await financialService.syncTransaction(t, orgId);
-            await fetchData(orgId);
-          } else {
-            setTransactions([t, ...transactions]);
-          }
-        }} 
+        onSave={handleAddTransaction} 
         categories={categories} 
         accounts={accounts} 
         transactions={transactions} 
