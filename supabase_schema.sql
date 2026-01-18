@@ -1,78 +1,26 @@
 
--- Garanta que estas políticas existam no seu painel do Supabase (SQL Editor)
+-- ... (código existente) ...
 
--- Permite que usuários autenticados criem suas próprias organizações
-CREATE POLICY "Users can create their own organizations" ON organizations
-    FOR INSERT WITH CHECK (auth.uid() = owner_id);
+-- CORREÇÃO DEFINITIVA DE FOREIGN KEYS (Execute este bloco no SQL Editor)
 
--- Permite que membros da organização criem vínculos (necessário para o owner se auto-vincular)
-CREATE POLICY "Users can insert their own membership" ON organization_members
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- 1. Remove constraints antigas que podem estar forçando NOT NULL ou integridade rígida
+ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS transactions_account_id_fkey;
 
--- Permite atualização do perfil pelo próprio usuário
-CREATE POLICY "Users can update own profile" ON profiles
-    FOR UPDATE USING (auth.uid() = id);
-
--- CRIAÇÃO DA TABELA DE CARTÕES DE CRÉDITO
-CREATE TABLE IF NOT EXISTS public.credit_cards (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    organization_id UUID NOT NULL REFERENCES public.organizations(id),
-    name TEXT NOT NULL,
-    brand TEXT NOT NULL,
-    "limit" NUMERIC NOT NULL DEFAULT 0,
-    closing_day INTEGER NOT NULL,
-    due_day INTEGER NOT NULL,
-    color TEXT,
-    account_id UUID REFERENCES public.bank_accounts(id)
-);
-
--- Habilita RLS para cartões
-ALTER TABLE public.credit_cards ENABLE ROW LEVEL SECURITY;
-
--- Políticas de acesso para cartões (baseado na organização)
-CREATE POLICY "Organization members can view credit cards" ON public.credit_cards
-    FOR SELECT USING (
-        organization_id IN (
-            SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
-        )
-    );
-
-CREATE POLICY "Organization members can insert credit cards" ON public.credit_cards
-    FOR INSERT WITH CHECK (
-        organization_id IN (
-            SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
-        )
-    );
-
-CREATE POLICY "Organization members can update credit cards" ON public.credit_cards
-    FOR UPDATE USING (
-        organization_id IN (
-            SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
-        )
-    );
-
-CREATE POLICY "Organization members can delete credit cards" ON public.credit_cards
-    FOR DELETE USING (
-        organization_id IN (
-            SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
-        )
-    );
-
--- ATUALIZAÇÃO DA TABELA DE TRANSAÇÕES
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS category TEXT;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_id UUID;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_number INTEGER;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_count INTEGER;
-
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS credit_card_id UUID REFERENCES public.credit_cards(id);
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS reconciled BOOLEAN DEFAULT false;
-
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT false;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS destination_account_id UUID REFERENCES public.bank_accounts(id);
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual';
-
--- IMPORTANTE: Tornar account_id opcional para transações de cartão e evitar erros de FK
+-- 2. Garante que as colunas aceitem NULL (essencial para cartões de crédito e importações parciais)
 ALTER TABLE public.transactions ALTER COLUMN account_id DROP NOT NULL;
 ALTER TABLE public.transactions ALTER COLUMN destination_account_id DROP NOT NULL;
+ALTER TABLE public.transactions ALTER COLUMN credit_card_id DROP NOT NULL;
+
+-- 3. Recria as constraints com ON DELETE SET NULL
+-- Isso impede que excluir uma conta bancária quebre o sistema (o lançamento apenas fica "sem conta")
+ALTER TABLE public.transactions 
+    ADD CONSTRAINT transactions_account_id_fkey 
+    FOREIGN KEY (account_id) 
+    REFERENCES public.bank_accounts(id) 
+    ON DELETE SET NULL;
+
+ALTER TABLE public.transactions 
+    ADD CONSTRAINT transactions_destination_account_id_fkey 
+    FOREIGN KEY (destination_account_id) 
+    REFERENCES public.bank_accounts(id) 
+    ON DELETE SET NULL;

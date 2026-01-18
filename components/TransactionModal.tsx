@@ -39,7 +39,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setDate(new Date().toISOString().split('T')[0]);
       setDueDate('');
       setCategoryId('');
-      setAccountId(accounts[0]?.id || '');
+      // Inicializa com a primeira conta válida se houver, ou vazio
+      setAccountId(accounts.length > 0 ? accounts[0].id : '');
       setCreditCardId('');
       setOriginType('account');
       setIsPaid(true);
@@ -69,8 +70,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       const selectedCat = categories.find(c => c.id === categoryId);
       const parsedAmount = parseFloat(amount);
 
-      // Lógica: O valor inserido é o valor DA PARCELA se estiver parcelado
-      // Se quiser que seja valor total, dividiria aqui: const finalAmount = isInstallment ? parsedAmount / installmentCount : parsedAmount;
+      // Validação de Segurança: Garante que o ID selecionado realmente existe na lista atual
+      // Isso previne o erro "violates foreign key constraint" se o state tiver um ID antigo
+      const validAccount = accounts.find(a => a.id === accountId);
+      const validCard = cards.find(c => c.id === creditCardId);
+      const validDestAccount = accounts.find(a => a.id === destinationAccountId);
+
+      // Determina os IDs finais com base no tipo de origem e validade
+      const finalAccountId = originType === 'account' && validAccount ? validAccount.id : undefined;
+      const finalCardId = originType === 'card' && validCard ? validCard.id : undefined;
+      const finalDestId = type === TransactionType.TRANSFER && validDestAccount ? validDestAccount.id : undefined;
 
       const newTransaction: Transaction = {
           id: 'temp-' + Date.now(),
@@ -83,9 +92,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           status: TransactionStatus.CONFIRMED,
           isPaid: originType === 'card' ? true : isPaid, // Cartão sempre entra como "pago" no sentido de usar limite
           source: 'manual',
-          accountId: originType === 'account' ? accountId : undefined,
-          creditCardId: originType === 'card' ? creditCardId : undefined,
-          destinationAccountId: type === TransactionType.TRANSFER ? destinationAccountId : undefined,
+          accountId: finalAccountId,
+          creditCardId: finalCardId,
+          destinationAccountId: finalDestId,
           reconciled: false,
           installmentCount: isInstallment ? installmentCount : undefined
       };
@@ -212,7 +221,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                            <input type="checkbox" checked={isPaid} onChange={() => setIsPaid(!isPaid)} className="hidden" />
                            <div>
                                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 block">{type === TransactionType.INCOME ? 'Recebido' : 'Pago'}</span>
-                               <span className="text-[10px] text-gray-400 block">{type === TransactionType.INCOME ? 'O valor já entrou na conta?' : 'O valor já saiu da conta?'}</span>
+                               <span className="text-sm text-gray-400 block">{type === TransactionType.INCOME ? 'O valor já entrou na conta?' : 'O valor já saiu da conta?'}</span>
                            </div>
                        </label>
                     )}
