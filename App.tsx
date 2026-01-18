@@ -34,7 +34,7 @@ import {
   Smartphone,
   PieChart
 } from 'lucide-react';
-import { Transaction, BankAccount, Category, CreditCard as CreditCardType, ThemeColor } from './types';
+import { Transaction, BankAccount, Category, CreditCard as CreditCardType, ThemeColor, AIRule } from './types';
 
 type AppState = 'BOOTING' | 'READY' | 'OFFLINE_ERROR';
 type View = 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'whatsapp' | 'settings';
@@ -46,6 +46,9 @@ const App: React.FC = () => {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>(() => offlineService.get('last_view', 'dashboard'));
   const [themeColor, setThemeColor] = useState<ThemeColor>(() => offlineService.get('theme_color', 'indigo'));
+  const [userName, setUserName] = useState(() => offlineService.get('user_name', 'Usuário'));
+  const [userPhone, setUserPhone] = useState(() => offlineService.get('user_phone', ''));
+  const [aiRules, setAiRules] = useState<AIRule[]>(() => offlineService.get('ai_rules', []));
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => offlineService.get('transactions', []));
   const [accounts, setAccounts] = useState<BankAccount[]>(() => offlineService.get('accounts', []));
@@ -63,8 +66,13 @@ const App: React.FC = () => {
     offlineService.save('transactions', transactions);
     offlineService.save('accounts', accounts);
     offlineService.save('categories', categories);
+    offlineService.save('cards', cards);
     offlineService.save('last_view', currentView);
-  }, [transactions, accounts, categories, currentView]);
+    offlineService.save('theme_color', themeColor);
+    offlineService.save('user_name', userName);
+    offlineService.save('user_phone', userPhone);
+    offlineService.save('ai_rules', aiRules);
+  }, [transactions, accounts, categories, cards, currentView, themeColor, userName, userPhone, aiRules]);
 
   const fetchData = useCallback(async (id: string) => {
     try {
@@ -92,6 +100,7 @@ const App: React.FC = () => {
         const id = await authService.ensureUserResources(currentSession.user.id, currentSession.user.email!);
         setOrgId(id);
         await fetchData(id);
+        if (currentSession.user.email) setUserName(currentSession.user.email.split('@')[0]);
       }
       setAppState('READY');
     } catch (e) {
@@ -104,7 +113,6 @@ const App: React.FC = () => {
     initialize();
   }, [initialize]);
 
-  // LEDGER HANDLERS - CORE ENGINE ENTRY POINTS
   const handleAddTransaction = async (t: Transaction) => {
     const newList = await ledgerService.performTransaction(t, orgId, transactions);
     setTransactions(newList);
@@ -118,11 +126,18 @@ const App: React.FC = () => {
 
   const accountBalances = useMemo(() => financialEngine.computeAllBalances(accounts, transactions), [accounts, transactions]);
 
-  // Inject updated balances into accounts for child components compatibility
   const accountsWithComputedBalances = useMemo(() => 
     accounts.map(acc => ({ ...acc, currentBalance: accountBalances[acc.id] || 0 })),
     [accounts, accountBalances]
   );
+
+  const handleLogout = async () => {
+    if (isConfigured) await authService.signOut();
+    setSession(null);
+    setOrgId(null);
+    if (!isDemoMode) setAppState('BOOTING');
+    window.location.reload();
+  };
 
   if (appState === 'BOOTING') return <LoadingScreen />;
   if (!session && !isDemoMode) return <Auth onAuthSuccess={(s) => setSession(s)} themeColor={themeColor} />;
@@ -163,6 +178,9 @@ const App: React.FC = () => {
           <NavItem icon={MessageSquare} label="Auditore AI" view="chat" />
           <NavItem icon={SettingsIcon} label="Configurações" view="settings" />
         </nav>
+        <button onClick={handleLogout} className="mt-auto flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all">
+          <LogOut size={20} /> Sair
+        </button>
       </aside>
 
       <main className="flex-1 overflow-y-auto relative bg-[#f8fafc] dark:bg-[#0b0e14]">
@@ -178,8 +196,12 @@ const App: React.FC = () => {
           {currentView === 'transactions' && (
             <TransactionList transactions={transactions} categories={categories} accounts={accountsWithComputedBalances} 
               onUpdateTransaction={async (t) => {
-                const newList = await ledgerService.performTransaction(t, orgId, transactions);
+                const newList = transactions.map(item => item.id === t.id ? t : item);
                 setTransactions(newList);
+                // No ledgerService update needed if we just update state, 
+                // but performTransaction is usually for NEW ones. 
+                // Let's manually save for simple updates:
+                offlineService.save('transactions', newList);
               }} 
               onToggleStatus={handleToggleStatus} />
           )}
@@ -195,7 +217,51 @@ const App: React.FC = () => {
                 if(orgId) await bankAccountsService.delete(id);
               }} />
           )}
-          {/* Outras views continuam iguais, apenas consumindo accountsWithComputedBalances se necessário */}
+          {currentView === 'cards' && (
+            <CreditCardManager 
+              cards={cards} 
+              transactions={transactions} 
+              onAddCard={(c) => setCards(prev => [...prev, c])} 
+              onDeleteCard={(id) => setCards(prev => prev.filter(c => c.id !== id))} 
+            />
+          )}
+          {currentView === 'categories' && (
+            <CategoryManager 
+              categories={categories} 
+              onAddCategory={(c) => setCategories(prev => [...prev, c])}
+              onUpdateCategory={(c) => setCategories(prev => prev.map(item => item.id === c.id ? c : item))}
+              onDeleteCategory={(id) => setCategories(prev => prev.filter(c => c.id !== id))}
+            />
+          )}
+          {currentView === 'chat' && (
+            <ChatInterface 
+              onAddTransaction={handleAddTransaction}
+              categories={categories}
+              userRules={aiRules}
+              onAddRule={(r) => setAiRules(prev => [...prev, r])}
+              themeColor={themeColor}
+              transactions={transactions}
+            />
+          )}
+          {currentView === 'settings' && (
+            <Settings 
+              themeColor={themeColor}
+              setThemeColor={setThemeColor}
+              userName={userName}
+              setUserName={setUserName}
+              userPhone={userPhone}
+              setUserPhone={setUserPhone}
+              aiRules={aiRules}
+              onAddAiRule={(r) => setAiRules(prev => [...prev, r])}
+              onDeleteAiRule={(idx) => setAiRules(prev => prev.filter((_, i) => i !== idx))}
+              onResetData={() => {
+                if(confirm("Tem certeza? Isso apagará todos os dados locais.")) {
+                  offlineService.clearAll();
+                  window.location.reload();
+                }
+              }}
+            />
+          )}
         </div>
       </main>
 
