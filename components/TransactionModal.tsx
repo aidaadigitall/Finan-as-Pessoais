@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType, TransactionStatus, Category, BankAccount, CreditCard } from '../types';
-import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, DollarSign, Tag, Landmark, Save, CreditCard as CardIcon, CalendarClock, Layers } from 'lucide-react';
+import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, DollarSign, Tag, Landmark, Save, CreditCard as CardIcon, CalendarClock, Layers, TrendingUp } from 'lucide-react';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -10,11 +10,12 @@ interface TransactionModalProps {
   categories: Category[];
   accounts: BankAccount[];
   cards: CreditCard[];
-  transactionToEdit?: Transaction | null; // Nova prop para edição
+  transactionToEdit?: Transaction | null; 
+  initialType?: TransactionType; // Nova prop
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({ 
-  isOpen, onClose, onSave, categories, accounts, cards, transactionToEdit 
+  isOpen, onClose, onSave, categories, accounts, cards, transactionToEdit, initialType 
 }) => {
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [description, setDescription] = useState('');
@@ -27,6 +28,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [destinationAccountId, setDestinationAccountId] = useState('');
   const [isPaid, setIsPaid] = useState(true);
   const [originType, setOriginType] = useState<'account' | 'card'>('account');
+  const [changeReason, setChangeReason] = useState('');
   
   // Parcelamento
   const [isInstallment, setIsInstallment] = useState(false);
@@ -54,9 +56,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setIsPaid(transactionToEdit.isPaid);
         setIsInstallment(!!transactionToEdit.installmentId); // Se tem ID de parcelamento, mostra como parcelado (visual apenas)
         setInstallmentCount(transactionToEdit.installmentCount || 2);
+        setChangeReason(transactionToEdit.amountChangeReason || '');
       } else {
-        // Modo Novo Lançamento: Reseta
-        setType(TransactionType.EXPENSE);
+        // Modo Novo Lançamento: Reseta e usa o initialType se fornecido
+        setType(initialType || TransactionType.EXPENSE);
         setDescription('');
         setAmount('');
         setDate(new Date().toISOString().split('T')[0]);
@@ -69,9 +72,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setIsPaid(true);
         setIsInstallment(false);
         setInstallmentCount(2);
+        setChangeReason('');
       }
     }
-  }, [isOpen, transactionToEdit, accounts, categories]);
+  }, [isOpen, transactionToEdit, accounts, categories, initialType]);
 
   const organizedCategories = useMemo(() => {
     const filtered = categories.filter(c => c.type === type || c.type === 'both');
@@ -130,12 +134,19 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           destinationAccountId: finalDestId,
           reconciled: transactionToEdit ? transactionToEdit.reconciled : false,
           installmentCount: isInstallment ? installmentCount : undefined,
-          installmentId: transactionToEdit ? transactionToEdit.installmentId : undefined // Mantém vínculo de parcela se existir
+          installmentId: transactionToEdit ? transactionToEdit.installmentId : undefined, // Mantém vínculo de parcela se existir
+          amountChangeReason: changeReason || undefined
       };
 
       onSave(newTransaction);
       onClose();
   };
+
+  // Lógica para detectar aumento de valor em despesa
+  const originalAmount = transactionToEdit ? transactionToEdit.amount : 0;
+  const currentAmount = parseFloat(amount || '0');
+  const hasIncrease = transactionToEdit && type === TransactionType.EXPENSE && currentAmount > originalAmount;
+  const increaseDiff = currentAmount - originalAmount;
 
   if (!isOpen) return null;
 
@@ -168,6 +179,25 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                             </p>
                         )}
                     </div>
+
+                    {/* Alerta de Acréscimo e Justificativa */}
+                    {hasIncrease && (
+                        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase flex items-center gap-1">
+                                    <TrendingUp size={12} /> Acréscimo detectado
+                                </span>
+                                <span className="font-black text-red-600 dark:text-red-400 text-sm">+ R$ {increaseDiff.toFixed(2)}</span>
+                            </div>
+                            <input
+                                type="text"
+                                value={changeReason}
+                                onChange={(e) => setChangeReason(e.target.value)}
+                                placeholder="Justificativa (Ex: Juros, Multa)"
+                                className="w-full p-2 text-sm bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 rounded-lg outline-none focus:ring-2 focus:ring-red-500 text-gray-700 dark:text-gray-200"
+                            />
+                        </div>
+                    )}
 
                     <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição" className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" />
 

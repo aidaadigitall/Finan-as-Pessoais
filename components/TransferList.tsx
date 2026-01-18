@@ -8,7 +8,7 @@ interface TransferListProps {
   accounts: BankAccount[];
   onDeleteTransaction: (id: string) => void;
   onEditTransaction: (t: Transaction) => void;
-  onOpenTransactionModal: () => void;
+  onOpenTransactionModal: (type?: TransactionType) => void; // Prop atualizada
 }
 
 export const TransferList: React.FC<TransferListProps> = ({ 
@@ -61,7 +61,7 @@ export const TransferList: React.FC<TransferListProps> = ({
             
             <div className="relative z-10 mt-4 md:mt-0 flex gap-4 w-full md:w-auto">
                  <button 
-                    onClick={onOpenTransactionModal}
+                    onClick={() => onOpenTransactionModal(TransactionType.TRANSFER)} // Envia tipo Transfer
                     className="w-full md:w-auto bg-white text-blue-600 px-4 py-3 rounded-xl font-bold hover:bg-gray-100 transition shadow-lg flex items-center justify-center gap-2"
                  >
                     <Plus size={18} /> Nova Transferência

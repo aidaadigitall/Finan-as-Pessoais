@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Transaction, Category, AIRule } from "../types";
 
@@ -6,6 +7,13 @@ const getAPIKeys = () => {
   const gemini = localStorage.getItem('finai_api_key_gemini') || process.env.API_KEY;
   const openai = localStorage.getItem('finai_api_key_openai');
   return { gemini, openai };
+};
+
+// Helper para limpar respostas JSON que vêm com markdown (```json ...)
+const cleanJsonString = (text: string): string => {
+    if (!text) return "{}";
+    // Remove marcadores de código markdown no início e fim
+    return text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '').trim();
 };
 
 // ==========================================
@@ -129,14 +137,16 @@ export const analyzeFinancialInput = async (
         }
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-3-flash-preview',
             contents: { parts: parts.length > 0 ? parts : [{ text: "Análise de transação" }] },
             config: {
                 systemInstruction: systemPrompt,
                 responseMimeType: "application/json",
             }
         });
-        return JSON.parse(response.text || "{}");
+        
+        const cleanText = cleanJsonString(response.text || "{}");
+        return JSON.parse(cleanText);
     }
 
     // 2. Fallback: OpenAI
@@ -157,7 +167,8 @@ export const analyzeFinancialInput = async (
         }
 
         const jsonResponse = await callOpenAI(openai, parts.length > 0 ? parts : "Analisar", systemPrompt, true);
-        return JSON.parse(jsonResponse || "{}");
+        const cleanText = cleanJsonString(jsonResponse || "{}");
+        return JSON.parse(cleanText);
     }
 
     return { isTransaction: false, responseMessage: "Erro de configuração." };
@@ -168,7 +179,7 @@ export const analyzeFinancialInput = async (
         isTransaction: false, 
         responseMessage: error.message.includes("API Key") 
             ? "Configure sua Chave de API nas configurações." 
-            : "Tive um problema técnico ao processar. Tente novamente." 
+            : `Tive um problema técnico ao processar: ${error.message}. Tente novamente.`
     };
   }
 };
@@ -204,7 +215,7 @@ export const getFinancialAdvice = async (
     if (gemini) {
         const ai = new GoogleGenAI({ apiKey: gemini });
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-3-flash-preview',
             contents: [{ text: finalPrompt }],
             config: { systemInstruction: systemInst }
         });

@@ -9,7 +9,7 @@ interface AccountsReceivableProps {
   accounts?: BankAccount[];
   onUpdateTransaction?: (t: Transaction) => void;
   onToggleStatus: (id: string) => void;
-  onOpenTransactionModal: () => void;
+  onOpenTransactionModal: (type?: TransactionType) => void; // Prop atualizada
 }
 
 export const AccountsReceivable: React.FC<AccountsReceivableProps> = ({ 
@@ -81,7 +81,7 @@ export const AccountsReceivable: React.FC<AccountsReceivableProps> = ({
             
              <div className="relative z-10 mt-4 md:mt-0 flex gap-4 w-full md:w-auto">
                  <button 
-                    onClick={onOpenTransactionModal}
+                    onClick={() => onOpenTransactionModal(TransactionType.INCOME)} // Envia tipo Income
                     className="w-full md:w-auto bg-white text-emerald-600 px-4 py-3 rounded-xl font-bold hover:bg-gray-100 transition shadow-lg flex items-center justify-center gap-2"
                  >
                     <Plus size={18} /> Nova Receita

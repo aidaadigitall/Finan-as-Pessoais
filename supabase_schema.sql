@@ -32,5 +32,8 @@ ALTER TABLE public.transactions
 -- Garante campo para comprovante
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS attachment_url TEXT;
 
+-- Garante campo para justificativa de alteração de valor
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS amount_change_reason TEXT;
+
 -- Garante campo para configurações na organização
 ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS settings JSONB DEFAULT '{}'::jsonb;

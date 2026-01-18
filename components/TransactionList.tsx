@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, Category, RecurrenceFrequency, RecurrenceLabels, BankAccount } from '../types';
-import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText, Bot, User, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, CalendarClock } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText, Bot, User, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, CalendarClock, ArrowRight, CreditCard } from 'lucide-react';
 import { exportToPDF, exportToExcel } from '../services/exportService';
 
 interface TransactionListProps {
@@ -125,7 +125,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Lançamentos</h3>
-           <div className="flex gap-2">
+           <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-400 mr-1" title="Opções de Exportação">
+                    <Download size={16} />
+                </div>
                 <button onClick={handleExportPDF} className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 px-3 py-2 rounded-lg transition">
                     <FileText size={16} /> PDF
                 </button>
@@ -291,6 +294,35 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                           }`}>
                               {selectedTransaction.type === 'income' ? 'Receita' : selectedTransaction.type === 'expense' ? 'Despesa' : 'Transferência'}
                           </span>
+                      </div>
+
+                      {/* NOVO BLOCO: DETALHES DA CONTA / TRANSFERÊNCIA */}
+                      <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
+                          <p className="text-xs text-gray-400 uppercase font-bold mb-1">
+                              {selectedTransaction.type === TransactionType.TRANSFER ? 'Fluxo da Transferência' : 'Conta / Origem'}
+                          </p>
+                          
+                          {selectedTransaction.type === TransactionType.TRANSFER ? (
+                              <div className="flex items-center gap-2 text-gray-800 dark:text-gray-200 font-medium text-sm">
+                                  <span className="flex items-center gap-1 bg-white dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-600">
+                                      {getAccountName(selectedTransaction.accountId)}
+                                  </span>
+                                  <ArrowRight size={14} className="text-blue-500 shrink-0" />
+                                  <span className="flex items-center gap-1 bg-white dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-600">
+                                      {getAccountName(selectedTransaction.destinationAccountId)}
+                                  </span>
+                              </div>
+                          ) : (
+                               <div className="flex items-center gap-2 text-gray-800 dark:text-gray-200 font-medium">
+                                  <Landmark size={16} className="text-gray-400"/>
+                                  {getAccountName(selectedTransaction.accountId)}
+                                  {selectedTransaction.creditCardId && (
+                                     <span className="text-xs bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                        <CreditCard size={10} /> Cartão
+                                     </span>
+                                  )}
+                               </div>
+                          )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">

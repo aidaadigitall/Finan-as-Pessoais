@@ -6,10 +6,10 @@ import { PaymentModal } from './PaymentModal';
 
 interface AccountsPayableProps {
   transactions: Transaction[];
-  accounts?: BankAccount[]; // Adicionado accounts opcional
-  onUpdateTransaction?: (t: Transaction) => void; // Adicionado onUpdateTransaction
-  onToggleStatus: (id: string) => void; // Mantido para compatibilidade, mas vamos usar onUpdateTransaction preferencialmente
-  onOpenTransactionModal: () => void;
+  accounts?: BankAccount[]; 
+  onUpdateTransaction?: (t: Transaction) => void;
+  onToggleStatus: (id: string) => void;
+  onOpenTransactionModal: (type?: TransactionType) => void; // Prop atualizada
 }
 
 export const AccountsPayable: React.FC<AccountsPayableProps> = ({ 
@@ -83,7 +83,7 @@ export const AccountsPayable: React.FC<AccountsPayableProps> = ({
             
             <div className="relative z-10 mt-4 md:mt-0 flex gap-4 w-full md:w-auto">
                  <button 
-                    onClick={onOpenTransactionModal}
+                    onClick={() => onOpenTransactionModal(TransactionType.EXPENSE)} // Envia tipo Expense
                     className="w-full md:w-auto bg-white text-red-600 px-4 py-3 rounded-xl font-bold hover:bg-gray-100 transition shadow-lg flex items-center justify-center gap-2"
                  >
                     <Plus size={18} /> Nova Despesa

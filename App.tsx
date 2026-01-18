@@ -27,7 +27,7 @@ import {
   CreditCard, Tag, MessageSquare, Menu, Loader2, AlertTriangle, RefreshCw, Briefcase,
   TrendingDown, TrendingUp, Settings as SettingsIcon, Layers, Trash2, ArrowRightLeft
 } from 'lucide-react';
-import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus, SystemSettings, UserProfile, AIRule } from './types';
+import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus, SystemSettings, UserProfile, AIRule, TransactionType } from './types';
 
 type AppState = 'BOOTING' | 'AUTH_REQUIRED' | 'LOADING_DATA' | 'READY' | 'CRITICAL_ERROR';
 type View = 'executive' | 'dashboard' | 'transactions' | 'transfers' | 'accounts' | 'cards' | 'categories' | 'chat' | 'payable' | 'receivable' | 'settings';
@@ -56,6 +56,8 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
+  // Estado para controlar qual aba do modal deve abrir por padrão (Despesa, Receita, Transf)
+  const [initialModalType, setInitialModalType] = useState<TransactionType>(TransactionType.EXPENSE);
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
       companyName: 'FinAI',
@@ -361,8 +363,9 @@ const App: React.FC = () => {
       setIsModalOpen(true);
   };
   
-  const openNewTransactionModal = () => {
+  const openNewTransactionModal = (type: TransactionType = TransactionType.EXPENSE) => {
       setTransactionToEdit(null);
+      setInitialModalType(type); // Define a modalidade inicial (Receita/Despesa/Transf)
       setIsModalOpen(true);
   };
 
@@ -495,7 +498,7 @@ const App: React.FC = () => {
           </div>
           
           {currentView !== 'settings' && (
-              <button onClick={openNewTransactionModal} className={`ml-4 bg-${systemSettings.themeColor}-600 text-white px-6 py-3 rounded-2xl font-black shadow-xl flex items-center gap-2 transition-all active:scale-95`}>
+              <button onClick={() => openNewTransactionModal()} className={`ml-4 bg-${systemSettings.themeColor}-600 text-white px-6 py-3 rounded-2xl font-black shadow-xl flex items-center gap-2 transition-all active:scale-95`}>
                   <Plus size={20}/> <span className="hidden sm:inline">Novo Lançamento</span>
               </button>
           )}
@@ -505,9 +508,9 @@ const App: React.FC = () => {
           {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor={systemSettings.themeColor} />}
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor={systemSettings.themeColor} categories={categories} />}
           {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransactionLocal} onToggleStatus={handleToggleStatus} onEditTransaction={handleEditTransaction} onDeleteTransaction={handleDeleteTransaction} />}
-          {currentView === 'transfers' && <TransferList transactions={transactions} accounts={accounts} onDeleteTransaction={handleDeleteTransaction} onEditTransaction={handleEditTransaction} onOpenTransactionModal={openNewTransactionModal} />}
-          {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
-          {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
+          {currentView === 'transfers' && <TransferList transactions={transactions} accounts={accounts} onDeleteTransaction={handleDeleteTransaction} onEditTransaction={handleEditTransaction} onOpenTransactionModal={() => openNewTransactionModal(TransactionType.TRANSFER)} />}
+          {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={() => openNewTransactionModal(TransactionType.EXPENSE)} />}
+          {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={() => openNewTransactionModal(TransactionType.INCOME)} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
           {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransactionLocal} onUpdateCard={handleUpdateCard} themeColor={systemSettings.themeColor} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={handleDeleteCategory} />}
@@ -545,6 +548,7 @@ const App: React.FC = () => {
          accounts={accounts} 
          cards={cards}
          transactionToEdit={transactionToEdit}
+         initialType={initialModalType} // Passa o tipo inicial
       />
 
       <ConfirmationModal

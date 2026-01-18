@@ -36,7 +36,8 @@ export const financialService = {
         installmentId: t.installment_id,
         installmentNumber: t.installment_number,
         installmentCount: t.installment_count,
-        attachmentUrl: t.attachment_url
+        attachmentUrl: t.attachment_url,
+        amountChangeReason: t.amount_change_reason
       }));
     } catch (e) {
       console.error("Erro ao carregar transações:", e);
@@ -152,7 +153,8 @@ export const financialService = {
             installment_id: installmentId,
             installment_number: installmentCount > 1 ? i + 1 : null,
             installment_count: installmentCount > 1 ? installmentCount : null,
-            attachment_url: t.attachmentUrl
+            attachment_url: t.attachmentUrl,
+            amount_change_reason: t.amountChangeReason
         });
     }
 
@@ -176,7 +178,8 @@ export const financialService = {
         destination_account_id: sanitizeId(t.destinationAccountId),
         credit_card_id: sanitizeId(t.creditCardId),
         source: t.source,
-        attachment_url: t.attachmentUrl
+        attachment_url: t.attachmentUrl,
+        amount_change_reason: t.amountChangeReason
       })
       .eq('id', t.id)
       .eq('organization_id', orgId);
