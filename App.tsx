@@ -184,6 +184,39 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [initialize]);
 
+  // --- REALTIME SUBSCRIPTION ---
+  useEffect(() => {
+    if (!orgId) return;
+
+    console.log("Iniciando escuta Realtime para organização:", orgId);
+
+    const channel = supabase
+      .channel('table-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuta INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'transactions',
+          filter: `organization_id=eq.${orgId}`
+        },
+        (payload) => {
+          console.log('Alteração recebida via WhatsApp/Realtime:', payload);
+          // Recarrega os dados para garantir consistência total (saldo, gráficos, etc)
+          loadData(orgId).then(() => {
+             if (payload.eventType === 'INSERT') {
+                 showNotification('Novo lançamento recebido via WhatsApp!', 'info');
+             }
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orgId, loadData]);
+
   const requestConfirmation = (
     title: string, 
     description: string, 

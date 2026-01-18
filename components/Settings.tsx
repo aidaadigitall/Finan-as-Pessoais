@@ -120,7 +120,19 @@ export const Settings: React.FC<SettingsProps> = ({
       // 1. Verificar se é um pedido de insight/consulta ou transação
       try {
           // Buscamos transações recentes para contexto se for insight
-          const transactions = await financialService.getTransactions(localSettings.companyName || 'org'); // Hack rápido: em prod use orgId real
+          // Precisamos do orgId. Como não recebemos via prop aqui, vamos tentar inferir ou usar um hook em uma refatoração maior.
+          // Por enquanto, assumimos que o financialService consegue pegar o contexto se autenticado, 
+          // mas para criar precisamos passar o orgId. 
+          // WORKAROUND: Vamos buscar a primeira organização do usuário logado via API para garantir.
+          
+          // Nota: Em produção real, o webhook receberia o número do telefone e buscaria a Org associada.
+          const { data: { user } } = await import('../lib/supabase').then(m => m.supabase.auth.getUser());
+          if(!user) throw new Error("Usuário não autenticado.");
+          
+          // Busca orgId rápida
+          const orgId = await import('../services/authService').then(s => s.authService.ensureUserResources(user.id, user.email!));
+
+          const transactions = await financialService.getTransactions(orgId);
 
           // Primeiro, tentamos analisar como transação
           const result = await analyzeFinancialInput(message, null, categories, userRules);
@@ -135,18 +147,24 @@ export const Settings: React.FC<SettingsProps> = ({
                   date: new Date().toISOString(),
                   isPaid: true,
                   status: TransactionStatus.CONFIRMED,
-                  source: 'whatsapp_ai'
+                  source: 'whatsapp_ai',
+                  installmentCount: details.installmentCount || undefined
               };
               
-              // Simula salvamento (Na App.tsx a função real seria injetada, aqui vamos apenas simular sucesso para a UI)
-              // Em produção, isso chamaria financialService.createTransaction(newT, orgId)
-              showNotification(`✅ Lançamento Realizado: ${details.description} - R$ ${details.amount}`);
+              // SALVAMENTO REAL NO BANCO
+              await financialService.createTransaction(newT, orgId);
+              
+              showNotification(`✅ Lançamento Salvo: ${details.description} - R$ ${details.amount}`);
           } else {
              // Se não for transação, é insight
              const advice = await getFinancialAdvice(message, transactions, categories);
-             showNotification(`🤖 Resposta IA: ${advice}`, 'info');
+             showNotification(`🤖 IA Respondeu (ver console)`, 'info');
+             // Em um app real, devolveriamos a resposta para o chat simulado
+             console.log("Resposta IA:", advice);
+             return; // Retorna para o componente saber que acabou
           }
       } catch (e: any) {
+          console.error(e);
           showNotification(`Erro na simulação: ${e.message}`, 'error');
           throw e;
       }
