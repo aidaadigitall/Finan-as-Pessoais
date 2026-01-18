@@ -95,7 +95,7 @@ export const financialService = {
         name: c.name,
         brand: c.brand,
         limit: Number(c.limit),
-        usedLimit: 0, // Calculado via transações no front ou outra query
+        usedLimit: 0,
         closingDay: c.closing_day,
         dueDay: c.due_day,
         color: c.color || 'indigo',
@@ -190,11 +190,11 @@ export const financialService = {
       .insert({
         name: card.name,
         brand: card.brand,
-        limit: card.limit,
+        "limit": card.limit, // Quote limit as it is a reserved word sometimes
         closing_day: card.closingDay,
         due_day: card.dueDay,
         color: card.color,
-        account_id: card.accountId, // Pode ser null
+        account_id: card.accountId || null, // Ensure empty string becomes null
         organization_id: orgId
       });
     
@@ -207,11 +207,11 @@ export const financialService = {
       .update({
         name: card.name,
         brand: card.brand,
-        limit: card.limit,
+        "limit": card.limit,
         closing_day: card.closingDay,
         due_day: card.dueDay,
         color: card.color,
-        account_id: card.accountId
+        account_id: card.accountId || null
       })
       .eq('id', card.id)
       .eq('organization_id', orgId);

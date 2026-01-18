@@ -13,6 +13,48 @@ CREATE POLICY "Users can insert their own membership" ON organization_members
 CREATE POLICY "Users can update own profile" ON profiles
     FOR UPDATE USING (auth.uid() = id);
 
--- Certifique-se de que a tabela organizations tem owner_id como UUID
--- Se o erro persistir, desabilite temporariamente o RLS da tabela organizations para testar:
--- ALTER TABLE organizations DISABLE ROW LEVEL SECURITY;
+-- CRIAÇÃO DA TABELA DE CARTÕES DE CRÉDITO
+CREATE TABLE IF NOT EXISTS public.credit_cards (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    organization_id UUID NOT NULL REFERENCES public.organizations(id),
+    name TEXT NOT NULL,
+    brand TEXT NOT NULL,
+    "limit" NUMERIC NOT NULL DEFAULT 0,
+    closing_day INTEGER NOT NULL,
+    due_day INTEGER NOT NULL,
+    color TEXT,
+    account_id UUID REFERENCES public.bank_accounts(id)
+);
+
+-- Habilita RLS para cartões
+ALTER TABLE public.credit_cards ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de acesso para cartões (baseado na organização)
+CREATE POLICY "Organization members can view credit cards" ON public.credit_cards
+    FOR SELECT USING (
+        organization_id IN (
+            SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Organization members can insert credit cards" ON public.credit_cards
+    FOR INSERT WITH CHECK (
+        organization_id IN (
+            SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Organization members can update credit cards" ON public.credit_cards
+    FOR UPDATE USING (
+        organization_id IN (
+            SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Organization members can delete credit cards" ON public.credit_cards
+    FOR DELETE USING (
+        organization_id IN (
+            SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
+        )
+    );

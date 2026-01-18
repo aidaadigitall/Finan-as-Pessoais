@@ -4,7 +4,7 @@ import { CreditCard as CreditCardType, Transaction, TransactionType, Transaction
 import { 
   CreditCard as CardIcon, Plus, Calendar, ShieldCheck, Trash2, Edit2,
   Receipt, CheckCircle2, Search, Wallet, X, Info, ShieldAlert, 
-  CheckCircle, HelpCircle, RefreshCw, TrendingDown, AlertTriangle 
+  CheckCircle, HelpCircle, RefreshCw, TrendingDown, AlertTriangle, Landmark 
 } from 'lucide-react';
 
 interface CreditCardManagerProps {
@@ -34,6 +34,7 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
   const [limit, setLimit] = useState('');
   const [closingDay, setClosingDay] = useState('10');
   const [dueDay, setDueDay] = useState('17');
+  const [cardAccountId, setCardAccountId] = useState('');
 
   const getCardSpending = (cardId: string) => {
     return transactions
@@ -75,6 +76,8 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
     setLimit(card.limit.toString());
     setClosingDay(card.closingDay.toString());
     setDueDay(card.dueDay.toString());
+    setCardAccountId(card.accountId || '');
+    setShowAddModal(true);
   };
 
   const handleSaveCard = () => {
@@ -89,7 +92,7 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
       closingDay: parseInt(closingDay),
       dueDay: parseInt(dueDay),
       color: editingCard ? editingCard.color : 'from-indigo-600 to-blue-700',
-      accountId: editingCard ? editingCard.accountId : ''
+      accountId: cardAccountId
     };
 
     if (editingCard) {
@@ -102,6 +105,7 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
     setEditingCard(null);
     setName('');
     setLimit('');
+    setCardAccountId('');
   };
 
   const auditStats = useMemo(() => {
@@ -132,7 +136,7 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
             <p className="text-sm text-gray-500">Controle faturas, audite gastos e gerencie seus limites.</p>
           </div>
         </div>
-        <button onClick={() => { setEditingCard(null); setShowAddModal(true); }} className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold shadow-lg transition active:scale-95`}>
+        <button onClick={() => { setEditingCard(null); setName(''); setLimit(''); setCardAccountId(''); setShowAddModal(true); }} className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold shadow-lg transition active:scale-95`}>
           <Plus size={18} /> Novo Cartão
         </button>
       </div>
@@ -200,7 +204,7 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
       {/* MODAL ADICIONAR / EDITAR CARTÃO */}
       {(showAddModal || editingCard) && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in">
-          <div className="bg-white dark:bg-[#1c2128] rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl border border-white/10">
+          <div className="bg-white dark:bg-[#1c2128] rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">
               {editingCard ? 'Editar Cartão' : 'Novo Cartão de Crédito'}
             </h3>
@@ -234,6 +238,15 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
                   <input type="number" value={dueDay} onChange={e => setDueDay(e.target.value)} className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold" />
                 </div>
               </div>
+              
+              <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Landmark size={10}/> Conta para Pagamento (Opcional)</label>
+                  <select value={cardAccountId} onChange={e => setCardAccountId(e.target.value)} className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
+                      <option value="">Nenhuma conta vinculada</option>
+                      {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({acc.bankName})</option>)}
+                  </select>
+              </div>
+
             </div>
             <div className="flex gap-4 mt-8">
               <button onClick={() => { setShowAddModal(false); setEditingCard(null); }} className="flex-1 py-3.5 text-gray-500 font-bold">Cancelar</button>
