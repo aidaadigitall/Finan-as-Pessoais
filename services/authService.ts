@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 
 export const authService = {
   async signInWithGoogle() {
-    // getURL was not exported from lib/supabase, using window.location.origin as a standard redirect
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
@@ -36,18 +35,22 @@ export const authService = {
   },
 
   async ensureUserResources(userId: string, email: string) {
-    // 1. Verificar perfil
+    // 1. Verificar perfil existente
     const { data: profile } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id')
       .eq('id', userId)
       .maybeSingle();
 
     if (!profile) {
-      await supabase.from('profiles').insert({ id: userId, email, full_name: email.split('@')[0] });
+      await supabase.from('profiles').insert({ 
+        id: userId, 
+        email, 
+        full_name: email.split('@')[0] 
+      });
     }
 
-    // 2. Verificar organização (tenant)
+    // 2. Verificar se o usuário já pertence a uma organização
     const { data: membership } = await supabase
       .from('organization_members')
       .select('organization_id')
@@ -56,21 +59,46 @@ export const authService = {
 
     if (membership) return membership.organization_id;
 
-    // 3. Criar nova organização se não existir
+    // 3. Criar Organização
+    // Importante: Verifique se no Supabase existe a política de INSERT para a tabela organizations
     const orgName = `Empresa de ${email.split('@')[0]}`;
     const { data: org, error: orgError } = await supabase
       .from('organizations')
-      .insert({ name: orgName, owner_id: userId })
+      .insert({ 
+        name: orgName, 
+        owner_id: userId 
+      })
       .select()
       .single();
 
-    if (orgError) throw orgError;
+    if (orgError) {
+      console.error("Erro ao criar organização:", orgError);
+      // Fallback: Tenta buscar uma organização onde ele já seja dono mas não membro (raro)
+      const { data: ownedOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('owner_id', userId)
+        .maybeSingle();
+      
+      if (ownedOrg) {
+         await supabase.from('organization_members').insert({
+            organization_id: ownedOrg.id,
+            user_id: userId,
+            role: 'owner'
+         });
+         return ownedOrg.id;
+      }
+      throw orgError;
+    }
 
-    await supabase.from('organization_members').insert({
+    // 4. Criar Vínculo de Membro
+    const { error: memberError } = await supabase.from('organization_members').insert({
       organization_id: org.id,
       user_id: userId,
       role: 'owner'
     });
+
+    if (memberError) throw memberError;
 
     return org.id;
   }
