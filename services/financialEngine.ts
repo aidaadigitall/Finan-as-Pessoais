@@ -10,7 +10,7 @@ export const financialEngine = {
       t => (t.accountId === account.id || t.destinationAccountId === account.id) && t.isPaid
     );
 
-    const netChange = accountTransactions.reduce((acc, t) => {
+    const netChange = accountTransactions.reduce((acc: number, t: Transaction) => {
       const amount = Number(t.amount) || 0;
       
       // Se for transferência
@@ -45,7 +45,8 @@ export const financialEngine = {
    */
   calculateGlobalBalance(accounts: BankAccount[], transactions: Transaction[]): number {
     const balances = this.computeAllBalances(accounts, transactions);
-    // Fix: Explicitly type the accumulator in reduce to avoid 'unknown' errors
-    return Object.values(balances).reduce((sum: number, b: number) => sum + b, 0);
+    // Correção do erro TS2322: Tipagem explícita dos valores como number[] e acumulador como number
+    const values = Object.values(balances) as number[];
+    return values.reduce((sum: number, b: number) => sum + b, 0);
   }
 };

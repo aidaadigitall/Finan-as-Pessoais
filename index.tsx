@@ -12,12 +12,15 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fix: Correctly extend Component with generics to ensure 'this.props' is typed.
+// Fixed class definition to include generic types for props and state
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = {
-    hasError: false,
-    error: null
-  };
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null
+    };
+  }
 
   static getDerivedStateFromError(error: any): ErrorBoundaryState {
     return { hasError: true, error };
@@ -28,6 +31,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   render() {
+    // Correctly accessing this.state which is now defined via Component generics
     const { hasError, error } = this.state;
 
     if (hasError) {
@@ -81,8 +85,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
     
-    // Fix: Children are accessed from this.props now that the class is correctly typed
-    return this.props.children || null;
+    // Correctly accessing this.props
+    return this.props.children;
   }
 }
 
