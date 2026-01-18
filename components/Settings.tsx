@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
-import { User, Building2, Palette, Brain, Key, Lock, Eye, EyeOff, Upload, Save, Globe, Smartphone, Shield, LogOut } from 'lucide-react';
-import { SystemSettings, UserProfile, ThemeColor } from '../types';
+import React, { useState, useEffect } from 'react';
+import { User, Building2, Palette, Brain, Key, Lock, Eye, EyeOff, Upload, Save, Globe, Smartphone, Shield, LogOut, Plus, Trash2, Search, Zap } from 'lucide-react';
+import { SystemSettings, UserProfile, ThemeColor, AIRule, Category } from '../types';
 import { NotificationToast, ToastType } from './NotificationToast';
 
 interface SettingsProps {
@@ -9,29 +9,42 @@ interface SettingsProps {
   onUpdateSettings: (newSettings: SystemSettings) => void;
   userProfile: UserProfile;
   onUpdateProfile: (newProfile: UserProfile) => void;
+  userRules?: AIRule[]; // Recebe regras
+  onUpdateRules?: (rules: AIRule[]) => void; // Atualiza regras
+  categories?: Category[]; // Necessário para selecionar categoria na regra
 }
 
 export const Settings: React.FC<SettingsProps> = ({
   settings,
   onUpdateSettings,
   userProfile,
-  onUpdateProfile
+  onUpdateProfile,
+  userRules = [],
+  onUpdateRules,
+  categories = []
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'system' | 'api' | 'ai'>('profile');
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
   const [notification, setNotification] = useState<{ message: string, type: ToastType } | null>(null);
 
-  // Local state for forms to handle inputs before saving
+  // Local state
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
   const [localProfile, setLocalProfile] = useState<UserProfile>(userProfile);
+  
+  // State for AI Rules
+  const [newRuleKeyword, setNewRuleKeyword] = useState('');
+  const [newRuleCategory, setNewRuleCategory] = useState('');
 
-  const themeColors: { name: ThemeColor, class: string }[] = [
-    { name: 'indigo', class: 'bg-indigo-600' },
-    { name: 'blue', class: 'bg-blue-600' },
-    { name: 'emerald', class: 'bg-emerald-600' },
-    { name: 'violet', class: 'bg-violet-600' },
-    { name: 'rose', class: 'bg-rose-600' },
-  ];
+  // Carregar API Keys do LocalStorage ao montar
+  useEffect(() => {
+      const savedGeminiKey = localStorage.getItem('finai_api_key_gemini');
+      if (savedGeminiKey) {
+          setLocalSettings(prev => ({
+              ...prev,
+              apiKeys: { ...prev.apiKeys, gemini: savedGeminiKey }
+          }));
+      }
+  }, []);
 
   const showNotification = (message: string, type: ToastType = 'success') => {
       setNotification({ message, type });
@@ -39,12 +52,33 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const handleSaveSystem = () => {
       onUpdateSettings(localSettings);
-      showNotification('Configurações do sistema salvas com sucesso!');
+      
+      // Salvar API Key especificamente no LocalStorage para o Service usar
+      if (localSettings.apiKeys.gemini) {
+          localStorage.setItem('finai_api_key_gemini', localSettings.apiKeys.gemini);
+      }
+
+      showNotification('Configurações salvas e chaves de API atualizadas!');
   };
 
   const handleSaveProfile = () => {
       onUpdateProfile(localProfile);
       showNotification('Perfil atualizado com sucesso!');
+  };
+
+  const handleAddRule = () => {
+      if (!newRuleKeyword || !newRuleCategory || !onUpdateRules) return;
+      const updatedRules = [...userRules, { keyword: newRuleKeyword, category: newRuleCategory }];
+      onUpdateRules(updatedRules);
+      setNewRuleKeyword('');
+      setNewRuleCategory('');
+      showNotification('Regra de IA adicionada!');
+  };
+
+  const handleDeleteRule = (index: number) => {
+      if (!onUpdateRules) return;
+      const updatedRules = userRules.filter((_, i) => i !== index);
+      onUpdateRules(updatedRules);
   };
 
   const toggleKeyVisibility = (key: string) => {
@@ -79,9 +113,16 @@ export const Settings: React.FC<SettingsProps> = ({
       </button>
   );
 
+  const themeColors: { name: ThemeColor, class: string }[] = [
+    { name: 'indigo', class: 'bg-indigo-600' },
+    { name: 'blue', class: 'bg-blue-600' },
+    { name: 'emerald', class: 'bg-emerald-600' },
+    { name: 'violet', class: 'bg-violet-600' },
+    { name: 'rose', class: 'bg-rose-600' },
+  ];
+
   return (
     <div className="flex flex-col md:flex-row gap-6 h-full relative">
-      {/* Toast Notification */}
       <NotificationToast 
         isVisible={!!notification}
         message={notification?.message || ''}
@@ -89,7 +130,6 @@ export const Settings: React.FC<SettingsProps> = ({
         onClose={() => setNotification(null)}
       />
 
-      {/* Sidebar */}
       <div className="w-full md:w-64 shrink-0 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 space-y-1 h-fit">
           <TabButton id="profile" icon={User} label="Meu Perfil" />
           <TabButton id="system" icon={Building2} label="Sistema e Marca" />
@@ -97,7 +137,6 @@ export const Settings: React.FC<SettingsProps> = ({
           <TabButton id="ai" icon={Brain} label="Regras de IA" />
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8">
           
           {/* --- PERFIL --- */}
@@ -235,21 +274,18 @@ export const Settings: React.FC<SettingsProps> = ({
              <div className="space-y-6 animate-in fade-in">
                 <div>
                   <h3 className="text-xl font-bold dark:text-white">Chaves de API</h3>
-                  <p className="text-gray-500 text-sm">Configure as integrações com Inteligência Artificial e outros serviços.</p>
+                  <p className="text-gray-500 text-sm">Insira sua chave do Google Gemini para ativar o Chat Inteligente.</p>
                </div>
 
                <div className="space-y-4">
                    {[
-                       { key: 'openai', label: 'OpenAI (GPT-4)', icon: Brain },
-                       { key: 'gemini', label: 'Google Gemini', icon: Globe },
-                       { key: 'anthropic', label: 'Anthropic Claude', icon: Brain },
-                       { key: 'copilot', label: 'Microsoft Copilot', icon: Shield },
-                       { key: 'grok', label: 'xAI Grok', icon: Smartphone },
-                       { key: 'deepseek', label: 'DeepSeek', icon: Brain }
+                       { key: 'gemini', label: 'Google Gemini (Obrigatório)', icon: Globe, help: 'Obtenha em aistudio.google.com' },
+                       { key: 'openai', label: 'OpenAI (GPT-4)', icon: Brain, help: 'Opcional' },
                    ].map((provider) => (
                        <div key={provider.key} className="space-y-1">
-                           <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                               <provider.icon size={14} /> {provider.label}
+                           <label className="text-xs font-bold text-gray-500 uppercase flex items-center justify-between">
+                               <span className="flex items-center gap-2"><provider.icon size={14} /> {provider.label}</span>
+                               <span className="text-[10px] text-indigo-500 cursor-pointer hover:underline">{provider.help}</span>
                            </label>
                            <div className="relative">
                                <input 
@@ -259,8 +295,8 @@ export const Settings: React.FC<SettingsProps> = ({
                                       ...localSettings, 
                                       apiKeys: { ...localSettings.apiKeys, [provider.key]: e.target.value }
                                   })}
-                                  placeholder={`sk-...`}
-                                  className="w-full p-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                                  placeholder={`Cole sua chave aqui...`}
+                                  className="w-full p-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
                                />
                                <button 
                                  onClick={() => toggleKeyVisibility(provider.key)}
@@ -273,19 +309,96 @@ export const Settings: React.FC<SettingsProps> = ({
                    ))}
                </div>
 
+               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl text-xs text-indigo-800 dark:text-indigo-300 flex items-start gap-2">
+                   <Shield size={16} className="shrink-0 mt-0.5" />
+                   <p>Suas chaves são salvas apenas no armazenamento local do seu navegador (LocalStorage) e enviadas diretamente para a API do provedor. Elas não passam por nossos servidores.</p>
+               </div>
+
                <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
                    <button onClick={handleSaveSystem} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-indigo-700 transition">
-                       <Save size={18} /> Atualizar Chaves
+                       <Save size={18} /> Salvar Chaves
                    </button>
                </div>
              </div>
           )}
 
+          {/* --- REGRAS DE IA --- */}
           {activeTab === 'ai' && (
-              <div className="flex flex-col items-center justify-center h-full text-center text-gray-400">
-                  <Brain size={48} className="mb-4 opacity-20" />
-                  <h3 className="text-lg font-bold">Regras de Categorização</h3>
-                  <p className="text-sm">Configuração de regras automáticas em breve.</p>
+              <div className="space-y-8 animate-in fade-in">
+                  <div>
+                      <h3 className="text-xl font-bold dark:text-white">Regras de Categorização Automática</h3>
+                      <p className="text-gray-500 text-sm">Ensine o FinAI a categorizar lançamentos específicos automaticamente.</p>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-700">
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                          <Zap size={16} className="text-amber-500" /> Nova Regra
+                      </h4>
+                      <div className="flex flex-col md:flex-row gap-4">
+                          <div className="flex-1 space-y-1">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase">Se a descrição conter...</label>
+                              <div className="relative">
+                                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                  <input 
+                                      type="text" 
+                                      value={newRuleKeyword}
+                                      onChange={(e) => setNewRuleKeyword(e.target.value)}
+                                      placeholder="Ex: Netflix, Uber, Posto"
+                                      className="w-full pl-10 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                  />
+                              </div>
+                          </div>
+                          <div className="flex-1 space-y-1">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase">Classificar como...</label>
+                              <select 
+                                  value={newRuleCategory}
+                                  onChange={(e) => setNewRuleCategory(e.target.value)}
+                                  className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                              >
+                                  <option value="">Selecione uma categoria</option>
+                                  {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                              </select>
+                          </div>
+                          <div className="flex items-end">
+                              <button 
+                                  onClick={handleAddRule}
+                                  disabled={!newRuleKeyword || !newRuleCategory}
+                                  className="w-full md:w-auto px-6 py-3 bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2"
+                              >
+                                  <Plus size={18} /> Adicionar
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Regras Ativas ({userRules.length})</h4>
+                      {userRules.length === 0 ? (
+                          <div className="text-center py-10 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl">
+                              <Brain size={32} className="mx-auto text-gray-300 mb-2" />
+                              <p className="text-gray-400 text-sm">Nenhuma regra definida.</p>
+                          </div>
+                      ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {userRules.map((rule, idx) => (
+                                  <div key={idx} className="flex justify-between items-center p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl hover:shadow-md transition">
+                                      <div>
+                                          <p className="text-xs text-gray-400 mb-1">Contém: <strong className="text-gray-700 dark:text-gray-300">"{rule.keyword}"</strong></p>
+                                          <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                                              <Zap size={12} fill="currentColor" /> {rule.category}
+                                          </p>
+                                      </div>
+                                      <button 
+                                          onClick={() => handleDeleteRule(idx)}
+                                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                                      >
+                                          <Trash2 size={16} />
+                                      </button>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
               </div>
           )}
       </div>

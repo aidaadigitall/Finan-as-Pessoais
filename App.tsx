@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, isConfigured } from './lib/supabase';
 import { authService } from './services/authService';
 import { financialService } from './services/financialService';
+import { offlineService } from './services/offlineService'; // Para persistência das regras
 
 import { ExecutiveDashboard } from './components/ExecutiveDashboard';
 import { Dashboard } from './components/Dashboard';
@@ -23,7 +24,7 @@ import {
   CreditCard, Tag, MessageSquare, Menu, Loader2, AlertTriangle, RefreshCw, Briefcase,
   TrendingDown, TrendingUp, Settings as SettingsIcon, Layers, Trash2
 } from 'lucide-react';
-import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus, SystemSettings, UserProfile } from './types';
+import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus, SystemSettings, UserProfile, AIRule } from './types';
 
 type AppState = 'BOOTING' | 'AUTH_REQUIRED' | 'LOADING_DATA' | 'READY' | 'CRITICAL_ERROR';
 type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'payable' | 'receivable' | 'settings';
@@ -69,6 +70,9 @@ const App: React.FC = () => {
       role: 'owner'
   });
 
+  // Estado das Regras de IA
+  const [userRules, setUserRules] = useState<AIRule[]>([]);
+
   // Estado para o Modal de Confirmação
   const [confirmModal, setConfirmModal] = useState<ConfirmationState>({
     isOpen: false,
@@ -90,12 +94,21 @@ const App: React.FC = () => {
       setCategories(c);
       setCards(crd);
       
+      // Carregar Regras Locais (simulando backend)
+      const savedRules = offlineService.get<AIRule[]>('ai_rules', []);
+      setUserRules(savedRules);
+
       setAppState('READY');
     } catch (e: any) {
       setErrorDetails(e.message);
       setAppState('CRITICAL_ERROR');
     }
   }, []);
+
+  const handleUpdateRules = (rules: AIRule[]) => {
+      setUserRules(rules);
+      offlineService.save('ai_rules', rules);
+  };
 
   const initialize = useCallback(async () => {
     if (!isConfigured) {
@@ -444,7 +457,18 @@ const App: React.FC = () => {
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
           {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransactionLocal} onUpdateCard={handleUpdateCard} themeColor={systemSettings.themeColor} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={handleDeleteCategory} />}
-          {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor={systemSettings.themeColor} transactions={transactions} />}
+          
+          {/* Passing updated AI Rules and Rules Updater to ChatInterface and Settings */}
+          {currentView === 'chat' && (
+              <ChatInterface 
+                  onAddTransaction={handleSaveTransaction} 
+                  categories={categories} 
+                  userRules={userRules} 
+                  onAddRule={handleUpdateRules} 
+                  themeColor={systemSettings.themeColor} 
+                  transactions={transactions} 
+              />
+          )}
           
           {currentView === 'settings' && (
               <Settings 
@@ -452,6 +476,9 @@ const App: React.FC = () => {
                 onUpdateSettings={setSystemSettings}
                 userProfile={userProfile}
                 onUpdateProfile={setUserProfile}
+                userRules={userRules}
+                onUpdateRules={handleUpdateRules}
+                categories={categories}
               />
           )}
         </div>

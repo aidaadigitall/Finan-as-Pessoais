@@ -2,9 +2,16 @@
 import { GoogleGenAI } from "@google/genai";
 import { Transaction, Category, AIRule } from "../types";
 
-// The API key must be obtained exclusively from process.env.API_KEY
-// Always use new GoogleGenAI({apiKey: process.env.API_KEY})
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Função auxiliar para obter a instância da IA com a chave mais recente
+const getAIClient = () => {
+  // Tenta pegar do ambiente (desenvolvimento) ou do localStorage (configuração do usuário)
+  const apiKey = localStorage.getItem('finai_api_key_gemini') || process.env.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("API Key não configurada. Vá em Configurações > Chaves de API.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const analyzeFinancialInput = async (
   textInput: string | null,
@@ -13,47 +20,76 @@ export const analyzeFinancialInput = async (
   userRules: AIRule[] = []
 ) => {
   try {
+    const ai = getAIClient();
     const parts: any[] = [];
+    
+    // 1. Processamento de Regras Manuais (Override)
+    // Se o texto contiver uma palavra-chave definida pelo usuário, forçamos a categoria.
+    let forcedCategory: string | null = null;
+    if (textInput && userRules.length > 0) {
+        const lowerInput = textInput.toLowerCase();
+        const rule = userRules.find(r => lowerInput.includes(r.keyword.toLowerCase()));
+        if (rule) {
+            forcedCategory = rule.category;
+        }
+    }
+
     if (textInput) {
       parts.push({ text: textInput });
     }
     
-    // Improved System Instruction for better transaction recognition
-    // Use ai.models.generateContent directly with model name
+    // Convertendo imagem para base64 se houver (lógica simplificada para o SDK novo)
+    if (mediaFile) {
+        const base64Data = await fileToGenerativePart(mediaFile);
+        parts.push(base64Data);
+    }
+
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash', // Modelo mais rápido e eficiente atual
       contents: { parts: parts.length > 0 ? parts : [{ text: "Análise de transação financeira" }] },
       config: {
-        systemInstruction: `Você é o FinAI, um assistente financeiro altamente inteligente. 
-        Seu objetivo é identificar se o usuário está relatando um gasto, ganho ou transferência.
+        systemInstruction: `Você é o FinAI, um assistente financeiro.
         
-        CRITÉRIOS DE RECONHECIMENTO:
-        - Frases como "Gastei X com Y", "Recebi X de Z", "Paguei a conta de W" são transações.
-        - Se for uma transação, defina isTransaction como true.
-        - Categorize com base na lista: ${JSON.stringify(availableCategories.map(c => c.name))}.
-        - Caso não tenha certeza da categoria, escolha a mais próxima ou "Outros".
-        - Se for apenas um cumprimento ou dúvida geral, isTransaction é false.
+        SEU OBJETIVO:
+        Identificar se o usuário relatou uma transação (gasto, ganho, transferência).
 
-        RETORNE APENAS JSON:
+        LISTA DE CATEGORIAS VÁLIDAS: 
+        ${JSON.stringify(availableCategories.map(c => c.name))}
+
+        ${forcedCategory ? `ATENÇÃO: Para este input, o usuário definiu uma REGRA DE OURO. A categoria DEVE ser estritamente "${forcedCategory}", independentemente do que você acha.` : ''}
+
+        DIRETRIZES:
+        1. Se for transação, "isTransaction": true.
+        2. Extraia valor (amount), descrição (description), tipo (income/expense) e categoria.
+        3. Se a data for mencionada (ex: "ontem", "hoje", "dia 15"), tente inferir (mas o front cuidará da data exata).
+        4. Se for parcelado (ex: "12x", "parcelado em 3 vezes"), extraia installmentCount.
+        5. "responseMessage" deve ser curta e amigável (estilo WhatsApp).
+
+        RETORNE JSON PURO:
         { 
           "isTransaction": boolean, 
           "transactionDetails": { 
             "description": string, 
             "amount": number, 
             "type": "income"|"expense", 
-            "category": string 
+            "category": string,
+            "installmentCount": number | null
           }, 
-          "responseMessage": string (Uma resposta amigável confirmando ou negando) 
+          "responseMessage": string 
         }`,
         responseMimeType: "application/json",
       }
     });
 
-    // Access .text property instead of calling .text()
     return JSON.parse(response.text || "{}");
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Error:", error);
-    return { isTransaction: false, responseMessage: "Desculpe, tive um problema ao processar isso. Pode repetir?" };
+    return { 
+        isTransaction: false, 
+        responseMessage: error.message.includes("API Key") 
+            ? "Configure sua Chave de API nas configurações para eu funcionar!" 
+            : "Tive um problema técnico. Tente novamente." 
+    };
   }
 };
 
@@ -63,32 +99,49 @@ export const getFinancialAdvice = async (
   categories: Category[]
 ) => {
   try {
-    // Adding summary to context for better reasoning
+    const ai = getAIClient();
+    
+    // Resumo simples para não estourar tokens
     const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
     const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
     const balance = totalIncome - totalExpense;
 
     const context = `
-      RESUMO FINANCEIRO:
-      - Saldo Atual: R$ ${balance.toFixed(2)}
-      - Total Receitas: R$ ${totalIncome.toFixed(2)}
-      - Total Despesas: R$ ${totalExpense.toFixed(2)}
-      - Últimos Lançamentos: ${JSON.stringify(transactions.slice(0, 5))}
-      - Categorias Disponíveis: ${JSON.stringify(categories.map(c => c.name))}
+      DADOS FINANCEIROS ATUAIS:
+      - Saldo: R$ ${balance.toFixed(2)}
+      - Receitas: R$ ${totalIncome.toFixed(2)}
+      - Despesas: R$ ${totalExpense.toFixed(2)}
+      - Últimos 5 lançamentos: ${JSON.stringify(transactions.slice(0, 5).map(t => `${t.description} (${t.amount})`))}
     `;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: [{ text: `${context}\n\nPergunta do Usuário: ${prompt}` }],
+      model: 'gemini-2.0-flash',
+      contents: [{ text: `${context}\n\nUsuário pergunta: ${prompt}` }],
       config: {
-        systemInstruction: "Você é um consultor financeiro de elite. Analise os dados fornecidos e responda de forma direta, técnica e motivacional em Português do Brasil. Use emojis para facilitar a leitura.",
+        systemInstruction: "Você é um consultor financeiro pessoal no WhatsApp. Responda de forma curta, direta, use emojis, formatação Markdown (negrito/itálico) e seja motivador. Fale em PT-BR.",
       }
     });
 
-    // Access .text property instead of calling .text()
     return response.text;
   } catch (error) {
-    console.error("Advice Error:", error);
-    return "Não consegui acessar seus dados financeiros para dar um conselho agora. Tente novamente em instantes.";
+    return "Preciso que você configure uma Chave de API válida nas configurações para analisar seus dados.";
   }
 };
+
+// Helper para converter File em formato aceito pelo Gemini
+async function fileToGenerativePart(file: File) {
+  return new Promise<any>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Data = (reader.result as string).split(',')[1];
+      resolve({
+        inlineData: {
+          data: base64Data,
+          mimeType: file.type
+        }
+      });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
