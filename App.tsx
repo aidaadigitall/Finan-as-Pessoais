@@ -15,6 +15,7 @@ import { ChatInterface } from './components/ChatInterface';
 import { Auth } from './components/Auth';
 import { AccountsPayable } from './components/AccountsPayable';
 import { AccountsReceivable } from './components/AccountsReceivable';
+import { ConfirmationModal } from './components/ConfirmationModal';
 
 import { 
   LayoutDashboard, List, Landmark, LogOut, Plus, 
@@ -25,6 +26,15 @@ import { Transaction, BankAccount, Category, CreditCard as CreditCardType, Trans
 
 type AppState = 'BOOTING' | 'AUTH_REQUIRED' | 'LOADING_DATA' | 'READY' | 'CRITICAL_ERROR';
 type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'payable' | 'receivable';
+
+interface ConfirmationState {
+  isOpen: boolean;
+  title: string;
+  description: string;
+  onConfirm: () => void;
+  variant?: 'danger' | 'warning';
+  confirmText?: string;
+}
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('BOOTING');
@@ -41,6 +51,14 @@ const App: React.FC = () => {
   
   // Estado para armazenar a transação sendo editada
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
+
+  // Estado para o Modal de Confirmação
+  const [confirmModal, setConfirmModal] = useState<ConfirmationState>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {}
+  });
 
   const loadData = useCallback(async (id: string) => {
     try {
@@ -95,6 +113,24 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [initialize]);
 
+  // Helper para abrir confirmação
+  const requestConfirmation = (
+    title: string, 
+    description: string, 
+    action: () => void, 
+    variant: 'danger' | 'warning' = 'danger',
+    confirmText: string = 'Confirmar'
+  ) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      description,
+      onConfirm: action,
+      variant,
+      confirmText
+    });
+  };
+
   const handleAddCard = async (card: CreditCardType) => {
     if (!orgId) return;
     try {
@@ -113,10 +149,19 @@ const App: React.FC = () => {
 
   const handleDeleteCard = async (id: string) => {
     if (!orgId) return;
-    try {
-      await financialService.deleteCreditCard(id);
-      await loadData(orgId);
-    } catch (e: any) { alert("Erro ao excluir cartão: " + e.message); }
+    
+    requestConfirmation(
+      "Excluir Cartão de Crédito?",
+      "Esta ação removerá o cartão e seu histórico de auditoria. As transações realizadas permanecerão no sistema.",
+      async () => {
+        try {
+          await financialService.deleteCreditCard(id);
+          await loadData(orgId);
+        } catch (e: any) { alert("Erro ao excluir cartão: " + e.message); }
+      },
+      'danger',
+      'Excluir Cartão'
+    );
   };
 
   const handleAddAccount = async (acc: BankAccount) => {
@@ -127,7 +172,6 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Erro ao criar conta: " + e.message); }
   };
 
-  // Implementação correta de atualização de conta
   const handleUpdateAccount = async (acc: BankAccount) => {
     if (!orgId) return;
     try {
@@ -136,14 +180,21 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Erro ao atualizar conta: " + e.message); }
   };
 
-  // Implementação correta de exclusão de conta
   const handleDeleteAccount = async (id: string) => {
     if (!orgId) return;
-    if (!confirm("Tem certeza que deseja excluir esta conta? Todas as transações vinculadas perderão a referência.")) return;
-    try {
-      await financialService.deleteBankAccount(id);
-      await loadData(orgId);
-    } catch (e: any) { alert("Erro ao excluir conta: " + e.message); }
+    
+    requestConfirmation(
+      "Excluir Conta Bancária?",
+      "Tem certeza que deseja excluir esta conta? Todas as transações vinculadas perderão a referência e o saldo será recalculado.",
+      async () => {
+        try {
+          await financialService.deleteBankAccount(id);
+          await loadData(orgId);
+        } catch (e: any) { alert("Erro ao excluir conta: " + e.message); }
+      },
+      'danger',
+      'Sim, Excluir'
+    );
   };
 
   const handleSaveTransaction = async (t: Transaction) => {
@@ -161,12 +212,10 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Erro ao salvar: " + e.message); }
   };
 
-  // Esta função apenas atualiza o estado local, ideal para toggle rápido
   const handleUpdateTransactionLocal = async (t: Transaction) => {
     setTransactions(prev => prev.map(item => item.id === t.id ? t : item));
   };
   
-  // Função que abre o modal já preenchido
   const handleEditTransaction = (t: Transaction) => {
       setTransactionToEdit(t);
       setIsModalOpen(true);
@@ -184,10 +233,22 @@ const App: React.FC = () => {
       await loadData(orgId);
     } catch (e: any) { alert("Erro ao criar categoria: " + e.message); }
   };
+
+  const handleDeleteCategory = async (id: string) => {
+     if (!orgId) return;
+     requestConfirmation(
+        "Excluir Categoria?",
+        "As transações vinculadas a esta categoria não serão excluídas, mas ficarão sem categoria definida.",
+        async () => {
+            // Implementação futura no service
+             setCategories(prev => prev.filter(c => c.id !== id));
+        },
+        'warning',
+        'Excluir'
+     );
+  }
   
   const handleToggleStatus = async (id: string) => {
-      // Toggle local para feedback instantâneo
-      // Idealmente, chamaria um serviço de updateStatus no backend aqui também
       setTransactions(prev => prev.map(t => {
           if (t.id === id) return { ...t, isPaid: !t.isPaid, status: !t.isPaid ? TransactionStatus.CONFIRMED : TransactionStatus.PENDING_AUDIT };
           return t;
@@ -247,10 +308,12 @@ const App: React.FC = () => {
           {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
           {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransactionLocal} onUpdateCard={handleUpdateCard} />}
-          {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={()=>{}} />}
+          {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={handleDeleteCategory} />}
           {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor="indigo" transactions={transactions} />}
         </div>
       </main>
+      
+      {/* Modais Globais */}
       <TransactionModal 
          isOpen={isModalOpen} 
          onClose={() => setIsModalOpen(false)} 
@@ -258,7 +321,17 @@ const App: React.FC = () => {
          categories={categories} 
          accounts={accounts} 
          cards={cards}
-         transactionToEdit={transactionToEdit} // Passa a transação para edição
+         transactionToEdit={transactionToEdit}
+      />
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
       />
     </div>
   );
