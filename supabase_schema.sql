@@ -60,9 +60,18 @@ CREATE POLICY "Organization members can delete credit cards" ON public.credit_ca
     );
 
 -- ATUALIZAÇÃO DA TABELA DE TRANSAÇÕES (Adiciona todas as colunas necessárias)
+-- Campos de Categorização e Parcelamento
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS category TEXT;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_id UUID;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_number INTEGER;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_count INTEGER;
+
+-- Campos de Cartão de Crédito e Conciliação
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS credit_card_id UUID REFERENCES public.credit_cards(id);
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS reconciled BOOLEAN DEFAULT false;
+
+-- Campos de Vencimento, Pagamento e Origem (Correção Atual)
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT false;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS destination_account_id UUID REFERENCES public.bank_accounts(id);
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual';
