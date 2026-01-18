@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { authService } from '../services/authService';
 import { Landmark, Mail, Lock, Loader2, ArrowRight, Info } from 'lucide-react';
 import { ThemeColor } from '../types';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isConfigured } from '../lib/supabase';
 
 interface AuthProps {
   onAuthSuccess: (session: any) => void;
@@ -49,7 +49,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, themeColor }) => {
     }
   };
 
-  const configured = isSupabaseConfigured();
+  const configured = isConfigured;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0b0e14] relative overflow-hidden p-4">

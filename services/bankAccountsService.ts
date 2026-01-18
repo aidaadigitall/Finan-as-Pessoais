@@ -1,11 +1,11 @@
 
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isConfigured } from '../lib/supabase';
 import { BankAccount } from '../types';
 
 export const bankAccountsService = {
   async list(orgId: string): Promise<BankAccount[]> {
-    if (!isSupabaseConfigured()) return [];
-    const { data, error } = await getSupabase()
+    if (!isConfigured) return [];
+    const { data, error } = await supabase
       .from('bank_accounts')
       .select('*')
       .eq('organization_id', orgId);
@@ -24,8 +24,8 @@ export const bankAccountsService = {
   },
 
   async create(account: Partial<BankAccount>, orgId: string): Promise<BankAccount> {
-    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado");
-    const { data, error } = await getSupabase()
+    if (!isConfigured) throw new Error("Supabase não configurado");
+    const { data, error } = await supabase
       .from('bank_accounts')
       .insert({
         name: account.name,
@@ -42,8 +42,8 @@ export const bankAccountsService = {
   },
 
   async delete(id: string) {
-    if (!isSupabaseConfigured()) return;
-    const { error } = await getSupabase()
+    if (!isConfigured) return;
+    const { error } = await supabase
       .from('bank_accounts')
       .delete()
       .eq('id', id);

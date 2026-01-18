@@ -1,9 +1,9 @@
 
-import { getSupabase, getURL } from '../lib/supabase';
+import { supabase, getURL } from '../lib/supabase';
 
 export const authService = {
   async signInWithGoogle() {
-    const { data, error } = await getSupabase().auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: getURL() },
     });
@@ -12,31 +12,29 @@ export const authService = {
   },
 
   async signIn(email: string, password: string) {
-    const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
   },
 
   async signUp(email: string, password: string) {
-    const { data, error } = await getSupabase().auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     return data;
   },
 
   async signOut() {
-    const { error } = await getSupabase().auth.signOut();
+    const { error } = await supabase.auth.signOut();
     if (error) throw error;
   },
 
   async getUserSession() {
-    const { data: { session }, error } = await getSupabase().auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession();
     if (error) throw error;
     return session;
   },
 
   async ensureUserResources(userId: string, email: string) {
-    const supabase = getSupabase();
-    
     // 1. Verificar perfil
     const { data: profile } = await supabase
       .from('profiles')

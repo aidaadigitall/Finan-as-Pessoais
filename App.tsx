@@ -1,284 +1,177 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { isSupabaseConfigured, getSupabase } from './lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase, testSupabaseConnection, isConfigured } from './lib/supabase';
 import { authService } from './services/authService';
-import { bankAccountsService } from './services/bankAccountsService';
-import { transactionsService } from './services/transactionsService';
-import { Transaction, BankAccount, TransactionType } from './types';
+import { financialService } from './services/financialService';
+import { ConnectionGuard } from './components/ConnectionGuard';
+import { Auth } from './components/Auth';
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
 import { TransactionModal } from './components/TransactionModal';
-import { Auth } from './components/Auth';
-import { BankAccountManager } from './components/BankAccountManager';
-import { LayoutDashboard, List, Landmark, LogOut, Plus, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { LayoutDashboard, List, Landmark, LogOut, Plus, Loader2 } from 'lucide-react';
+import { Transaction, BankAccount } from './types';
 
-type AppState = 'initializing' | 'authenticated' | 'unauthenticated' | 'error';
+type AppState = 'BOOTING' | 'AUTH_CHECK' | 'READY' | 'OFFLINE_ERROR';
 
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>('initializing');
+  const [appState, setAppState] = useState<AppState>('BOOTING');
   const [session, setSession] = useState<any>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isTransModalOpen, setIsTransModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const initTimeout = useRef<any>(null);
-
-  const categories = [
-    { id: '1', name: 'Alimentação', type: 'expense' },
-    { id: '2', name: 'Moradia', type: 'expense' },
-    { id: '3', name: 'Salário', type: 'income' },
-    { id: '4', name: 'Lazer', type: 'expense' },
-    { id: '5', name: 'Investimentos', type: 'both' }
-  ];
-
-  const fetchData = useCallback(async (currentOrgId: string) => {
+  const loadData = useCallback(async (id: string) => {
     try {
-      const [accs, trans] = await Promise.all([
-        bankAccountsService.list(currentOrgId),
-        transactionsService.list(currentOrgId)
+      const [t, a] = await Promise.all([
+        financialService.getTransactions(id),
+        financialService.getBankAccounts(id)
       ]);
-      setAccounts(accs);
-      setTransactions(trans);
-    } catch (e: any) {
-      console.error("Erro ao sincronizar dados:", e);
+      setTransactions(t);
+      setAccounts(a);
+    } catch (e) {
+      console.error('Falha ao carregar dados:', e);
     }
   }, []);
 
-  const bootstrap = useCallback(async (currentSession: any) => {
-    try {
-      const id = await authService.ensureUserResources(
-        currentSession.user.id, 
-        currentSession.user.email!
-      );
-      setOrgId(id);
-      await fetchData(id);
-      setState('authenticated');
-    } catch (err: any) {
-      console.error("Bootstrap error:", err);
-      setErrorMsg("Não foi possível carregar sua organização.");
-      setState('error');
-    }
-  }, [fetchData]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      setState('error');
-      setErrorMsg("Configuração do Supabase ausente (VITE_SUPABASE_URL / ANON_KEY).");
+  const initialize = useCallback(async (retry = false) => {
+    setAppState('BOOTING');
+    
+    // 1. Validar Configuração
+    if (!isConfigured && !retry) {
+      setAppState('OFFLINE_ERROR');
       return;
     }
 
-    // Timeout de segurança: 10 segundos
-    initTimeout.current = setTimeout(() => {
-      if (state === 'initializing') {
-        setState('error');
-        setErrorMsg("O servidor demorou muito para responder. Verifique sua conexão.");
+    // 2. Testar Conexão com Timeout
+    const online = await testSupabaseConnection(6000);
+    
+    if (!online && !isDemoMode) {
+      setAppState('OFFLINE_ERROR');
+      return;
+    }
+
+    // 3. Checar Sessão
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      
+      if (currentSession) {
+        const id = await authService.ensureUserResources(currentSession.user.id, currentSession.user.email!);
+        setOrgId(id);
+        await loadData(id);
       }
-    }, 10000);
+      setAppState('READY');
+    } catch (e) {
+      console.warn('Erro na autenticação, entrando em modo limitado');
+      setAppState('READY');
+    }
+  }, [isDemoMode, loadData]);
 
-    const checkSession = async () => {
-      try {
-        const session = await authService.getUserSession();
-        setSession(session);
-        if (session) {
-          await bootstrap(session);
-        } else {
-          setState('unauthenticated');
-        }
-      } catch (err) {
-        setState('unauthenticated');
-      } finally {
-        if (initTimeout.current) clearTimeout(initTimeout.current);
-      }
-    };
+  useEffect(() => {
+    initialize();
 
-    checkSession();
+    const { data: { subscription } } = supabase?.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) initialize();
+    }) || { data: { subscription: { unsubscribe: () => {} } } };
 
-    const { data: { subscription } } = getSupabase().auth.onAuthStateChange(async (event, newSession) => {
-      setSession(newSession);
-      if (newSession) {
-        await bootstrap(newSession);
-      } else {
-        setState('unauthenticated');
-      }
-    });
+    return () => subscription.unsubscribe();
+  }, [initialize]);
 
-    return () => {
-      subscription.unsubscribe();
-      if (initTimeout.current) clearTimeout(initTimeout.current);
-    };
-  }, [bootstrap]);
-
-  const accountsWithBalances = accounts.map(acc => {
-    const income = transactions
-      .filter(t => t.accountId === acc.id && t.type === TransactionType.INCOME && t.isPaid)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const expense = transactions
-      .filter(t => t.accountId === acc.id && t.type === TransactionType.EXPENSE && t.isPaid)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const transfersIn = transactions
-      .filter(t => t.destinationAccountId === acc.id && t.type === TransactionType.TRANSFER && t.isPaid)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const transfersOut = transactions
-      .filter(t => t.accountId === acc.id && t.type === TransactionType.TRANSFER && t.isPaid)
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    return {
-      ...acc,
-      currentBalance: acc.initialBalance + income - expense + transfersIn - transfersOut
-    };
-  });
-
-  const handleAddTransaction = async (t: Partial<Transaction>) => {
-    if (!orgId) return;
-    await transactionsService.create(t, orgId);
-    await fetchData(orgId);
-  };
-
-  const handleToggleStatus = async (id: string) => {
-    const trans = transactions.find(t => t.id === id);
-    if (!trans || !orgId) return;
-    await transactionsService.updateStatus(id, !trans.isPaid);
-    await fetchData(orgId);
-  };
-
-  const handleAddAccount = async (acc: Partial<BankAccount>) => {
-    if (!orgId) return;
-    await bankAccountsService.create(acc, orgId);
-    await fetchData(orgId);
-  };
-
-  if (state === 'initializing') return (
-    <div className="h-screen flex items-center justify-center bg-[#0b141a] text-white flex-col gap-6">
-      <div className="relative">
-        <div className="w-16 h-16 border-4 border-indigo-500/20 rounded-full"></div>
-        <div className="absolute top-0 w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-      <div className="text-center space-y-2">
-        <h2 className="text-xl font-bold tracking-tight">FinAI Cloud</h2>
-        <p className="animate-pulse text-sm text-gray-400">Autenticando sessão segura...</p>
-      </div>
-    </div>
-  );
-
-  if (state === 'error') return (
-    <div className="h-screen flex items-center justify-center bg-[#0b141a] text-white p-6">
-      <div className="max-w-md w-full bg-[#1c2128] border border-red-500/20 p-10 rounded-[2.5rem] text-center shadow-2xl space-y-8">
-        <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto ring-4 ring-red-500/5">
-          <AlertCircle size={40} className="text-red-500" />
+  if (appState === 'BOOTING') {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#0b141a] text-white gap-6">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-indigo-500/20 rounded-full"></div>
+          <div className="absolute top-0 w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
-        <div className="space-y-3">
-          <h2 className="text-2xl font-bold">Falha na Conexão</h2>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            {errorMsg || "Ocorreu um erro inesperado ao conectar com o banco de dados."}
-          </p>
+        <div className="text-center">
+          <h2 className="text-xl font-bold">FinAI</h2>
+          <p className="text-sm text-gray-500 animate-pulse">Estabelecendo conexão segura...</p>
         </div>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 rounded-2xl transition-all font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-        >
-          <RefreshCw size={18} /> Tentar Novamente
-        </button>
       </div>
-    </div>
-  );
+    );
+  }
 
-  if (state === 'unauthenticated') return <Auth onAuthSuccess={(s) => setSession(s)} themeColor="indigo" />;
+  if (appState === 'OFFLINE_ERROR' && !isDemoMode) {
+    return (
+      <ConnectionGuard 
+        isOnline={false} 
+        isDemoMode={false} 
+        onRetry={() => initialize(true)} 
+        onContinueOffline={() => {
+          setIsDemoMode(true);
+          setAppState('READY');
+        }}
+        error={!isConfigured ? "Variáveis de ambiente VITE_SUPABASE_* não detectadas." : undefined}
+      />
+    );
+  }
+
+  if (!session && !isDemoMode) {
+    return <Auth onAuthSuccess={(s) => setSession(s)} themeColor="indigo" />;
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
-      {/* Sidebar - Desktop */}
-      <aside className="w-72 bg-white dark:bg-[#1c2128] border-r border-gray-200 dark:border-gray-800 p-8 flex flex-col hidden lg:flex">
-        <div className="mb-12 flex items-center gap-4">
-           <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-600/30">
-              <Landmark size={24} />
-           </div>
-           <div>
-             <span className="text-xl font-black dark:text-white block leading-none">FinAI</span>
-             <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">SaaS Edition</span>
-           </div>
-        </div>
-        
-        <nav className="flex-1 space-y-2">
-          <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <NavItem icon={<List size={20}/>} label="Extrato" active={activeTab === 'list'} onClick={() => setActiveTab('list')} />
-          <NavItem icon={<Landmark size={20}/>} label="Contas" active={activeTab === 'banks'} onClick={() => setActiveTab('banks')} />
-        </nav>
+      <ConnectionGuard 
+        isOnline={appState === 'READY'} 
+        isDemoMode={isDemoMode} 
+        onRetry={() => {
+          setIsDemoMode(false);
+          initialize();
+        }}
+        onContinueOffline={() => setIsDemoMode(true)}
+      />
 
-        <div className="mt-auto pt-8 border-t border-gray-100 dark:border-gray-800">
-          <button onClick={() => authService.signOut()} className="w-full flex items-center gap-4 px-5 py-4 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition-all font-bold">
-            <LogOut size={20} /> Sair do Sistema
-          </button>
+      {/* Sidebar Simples */}
+      <aside className="w-64 bg-white dark:bg-[#1c2128] border-r border-gray-200 dark:border-gray-800 p-6 hidden lg:flex flex-col">
+        <div className="mb-8 flex items-center gap-3">
+          <div className="p-2 bg-indigo-600 rounded-lg text-white"><Landmark size={20}/></div>
+          <span className="font-black text-xl tracking-tight dark:text-white">FinAI</span>
         </div>
+        <nav className="flex-1 space-y-1">
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-100'}`}>
+            <LayoutDashboard size={18}/> Dashboard
+          </button>
+          <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'list' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-100'}`}>
+            <List size={18}/> Extrato
+          </button>
+        </nav>
+        <button onClick={() => authService.signOut()} className="mt-auto flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl transition">
+          <LogOut size={18}/> Sair
+        </button>
       </aside>
 
-      <main className="flex-1 overflow-y-auto p-6 lg:p-12">
-        <header className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-           <div>
-             <h2 className="text-3xl font-black dark:text-white tracking-tight">Finanças Inteligentes</h2>
-             <p className="text-gray-500 font-medium">Controle multi-empresa unificado</p>
-           </div>
-           <button onClick={() => setIsTransModalOpen(true)} className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-black shadow-2xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-3 active:scale-95">
-             <Plus size={22} /> Novo Lançamento
-           </button>
+      <main className="flex-1 overflow-y-auto p-6 md:p-10">
+        <header className="flex justify-between items-center mb-10">
+          <h1 className="text-2xl font-black dark:text-white">Financeiro</h1>
+          <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-indigo-600/20 hover:scale-105 active:scale-95 transition">
+            <Plus size={20}/> Novo Lançamento
+          </button>
         </header>
 
-        <div className="max-w-7xl mx-auto space-y-12">
-          {activeTab === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={categories as any} />}
-          {activeTab === 'list' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4">
-              <TransactionList 
-                transactions={transactions} 
-                categories={categories as any} 
-                accounts={accountsWithBalances} 
-                onUpdateTransaction={() => {}} 
-                onToggleStatus={handleToggleStatus} 
-              />
-            </div>
-          )}
-          {activeTab === 'banks' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4">
-              <BankAccountManager 
-                accounts={accountsWithBalances} 
-                transactions={transactions} 
-                onAddAccount={handleAddAccount} 
-                onUpdateAccount={() => {}} 
-                onDeleteAccount={async (id) => { 
-                  await bankAccountsService.delete(id); 
-                  if(orgId) fetchData(orgId); 
-                }} 
-              />
-            </div>
-          )}
-        </div>
+        {activeTab === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={[]} />}
+        {activeTab === 'list' && <TransactionList transactions={transactions} categories={[]} accounts={accounts} onUpdateTransaction={() => {}} onToggleStatus={() => {}} />}
       </main>
 
       <TransactionModal 
-        isOpen={isTransModalOpen} 
-        onClose={() => setIsTransModalOpen(false)} 
-        onSave={handleAddTransaction} 
-        categories={categories as any} 
-        accounts={accountsWithBalances} 
-        transactions={transactions} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSave={async (t) => {
+          if (orgId) {
+            await financialService.syncTransaction(t, orgId);
+            loadData(orgId);
+          }
+        }} 
+        categories={[]} accounts={accounts} transactions={transactions} 
       />
     </div>
   );
 };
-
-const NavItem = ({ icon, label, active, onClick }: any) => (
-  <button 
-    onClick={onClick} 
-    className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold ${
-      active 
-        ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20 translate-x-1' 
-        : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
-    }`}
-  >
-    {icon} {label}
-  </button>
-);
 
 export default App;

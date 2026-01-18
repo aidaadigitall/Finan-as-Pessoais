@@ -1,11 +1,11 @@
 
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isConfigured } from '../lib/supabase';
 import { Transaction, TransactionType, TransactionStatus } from '../types';
 
 export const transactionsService = {
   async list(orgId: string): Promise<Transaction[]> {
-    if (!isSupabaseConfigured()) return [];
-    const { data, error } = await getSupabase()
+    if (!isConfigured) return [];
+    const { data, error } = await supabase
       .from('transactions')
       .select('*')
       .eq('organization_id', orgId)
@@ -31,11 +31,10 @@ export const transactionsService = {
   },
 
   async create(t: Partial<Transaction>, orgId: string): Promise<Transaction> {
-    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado");
-    const client = getSupabase();
-    const { data: { user } } = await client.auth.getUser();
+    if (!isConfigured) throw new Error("Supabase não configurado");
+    const { data: { user } } = await supabase.auth.getUser();
     
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from('transactions')
       .insert({
         description: t.description,
@@ -59,8 +58,8 @@ export const transactionsService = {
   },
 
   async updateStatus(id: string, isPaid: boolean) {
-    if (!isSupabaseConfigured()) return;
-    const { error } = await getSupabase()
+    if (!isConfigured) return;
+    const { error } = await supabase
       .from('transactions')
       .update({ is_paid: isPaid })
       .eq('id', id);
@@ -68,8 +67,8 @@ export const transactionsService = {
   },
 
   async delete(id: string) {
-    if (!isSupabaseConfigured()) return;
-    const { error } = await getSupabase()
+    if (!isConfigured) return;
+    const { error } = await supabase
       .from('transactions')
       .delete()
       .eq('id', id);

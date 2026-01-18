@@ -1,26 +1,18 @@
 
-/**
- * Explicit type definitions for NodeJS and ImportMeta to satisfy 
- * the environment variable access patterns across the app.
- */
-declare namespace NodeJS {
-  interface ProcessEnv {
-    readonly VITE_SUPABASE_URL: string;
-    readonly VITE_SUPABASE_ANON_KEY: string;
-    readonly API_KEY: string;
-    readonly VITE_SITE_URL?: string;
-    readonly VITE_VERCEL_URL?: string;
-  }
-}
-
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_SUPABASE_ANON_KEY: string;
   readonly API_KEY: string;
-  readonly VITE_SITE_URL?: string;
-  readonly VITE_VERCEL_URL?: string;
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
+}
+
+declare namespace NodeJS {
+  interface ProcessEnv {
+    VITE_SUPABASE_URL: string;
+    VITE_SUPABASE_ANON_KEY: string;
+    API_KEY: string;
+  }
 }
