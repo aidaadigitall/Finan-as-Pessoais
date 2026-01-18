@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { User, Building2, Palette, Brain, Key, Lock, Eye, EyeOff, Upload, Save, Globe, Smartphone, Shield, LogOut } from 'lucide-react';
 import { SystemSettings, UserProfile, ThemeColor } from '../types';
+import { NotificationToast, ToastType } from './NotificationToast';
 
 interface SettingsProps {
   settings: SystemSettings;
@@ -18,6 +19,7 @@ export const Settings: React.FC<SettingsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'system' | 'api' | 'ai'>('profile');
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
+  const [notification, setNotification] = useState<{ message: string, type: ToastType } | null>(null);
 
   // Local state for forms to handle inputs before saving
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
@@ -31,14 +33,18 @@ export const Settings: React.FC<SettingsProps> = ({
     { name: 'rose', class: 'bg-rose-600' },
   ];
 
+  const showNotification = (message: string, type: ToastType = 'success') => {
+      setNotification({ message, type });
+  };
+
   const handleSaveSystem = () => {
       onUpdateSettings(localSettings);
-      alert('Configurações do sistema salvas!');
+      showNotification('Configurações do sistema salvas com sucesso!');
   };
 
   const handleSaveProfile = () => {
       onUpdateProfile(localProfile);
-      alert('Perfil atualizado com sucesso!');
+      showNotification('Perfil atualizado com sucesso!');
   };
 
   const toggleKeyVisibility = (key: string) => {
@@ -74,7 +80,15 @@ export const Settings: React.FC<SettingsProps> = ({
   );
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 h-full">
+    <div className="flex flex-col md:flex-row gap-6 h-full relative">
+      {/* Toast Notification */}
+      <NotificationToast 
+        isVisible={!!notification}
+        message={notification?.message || ''}
+        type={notification?.type || 'success'}
+        onClose={() => setNotification(null)}
+      />
+
       {/* Sidebar */}
       <div className="w-full md:w-64 shrink-0 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 space-y-1 h-fit">
           <TabButton id="profile" icon={User} label="Meu Perfil" />

@@ -23,7 +23,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  
+  // Ordenação padrão definida para data descendente (Mais recente -> Mais antigo)
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'desc' });
   const [detailsModalId, setDetailsModalId] = useState<string | null>(null);
 
   const getAccountName = (id?: string) => accounts.find(a => a.id === id)?.name || 'Conta Padrão';
@@ -73,7 +75,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         return 0;
       });
     } else {
-        // Padrão: Mais recente para o mais antigo
+        // Fallback redundante, mas seguro
         sortableItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
     return sortableItems;
