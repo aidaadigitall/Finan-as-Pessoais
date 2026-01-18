@@ -12,9 +12,9 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fixed class definition by ensuring it extends React.Component with <ErrorBoundaryProps, ErrorBoundaryState>
-// This ensures that this.state and this.props are correctly typed and accessible in a class component.
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fixed class definition by ensuring it correctly extends React.Component<ErrorBoundaryProps, ErrorBoundaryState>
+// In TypeScript, class components must explicitly define the shape of props and state via generics.
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -32,7 +32,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   render() {
-    // Accessing this.state which is now correctly inherited from Component
+    // Accessing this.state which is now correctly typed and inherited from Component
     const { hasError, error } = this.state;
 
     if (hasError) {
@@ -86,7 +86,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
     
-    // Accessing this.props which is now correctly inherited from Component
+    // Accessing this.props which is now correctly typed and inherited from Component
     return this.props.children;
   }
 }

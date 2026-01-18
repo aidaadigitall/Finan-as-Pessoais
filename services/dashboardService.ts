@@ -1,6 +1,7 @@
 
-import { supabase } from '../lib/supabase';
-import { Transaction, BankAccount, TransactionType, TransactionStatus } from '../types';
+import { supabase, isConfigured } from '../lib/supabase';
+import { offlineService } from './offlineService';
+import { Transaction, BankAccount, TransactionType } from '../types';
 
 export interface DashboardMetrics {
   totalBalance: number;
@@ -23,32 +24,56 @@ export interface DREItem {
 
 export const dashboardService = {
   async getExecutiveDashboard(orgId: string, startDate: string, endDate: string) {
-    // Busca transações do período e todas as contas para saldo global
-    const [transactionsRes, accountsRes] = await Promise.all([
-      supabase
-        .from('transactions')
-        .select('*')
-        .eq('organization_id', orgId)
-        .gte('date', startDate)
-        .lte('date', endDate),
-      supabase
-        .from('bank_accounts')
-        .select('*')
-        .eq('organization_id', orgId)
-    ]);
+    let transactions: Transaction[] = [];
+    let accounts: BankAccount[] = [];
 
-    if (transactionsRes.error) throw transactionsRes.error;
-    if (accountsRes.error) throw accountsRes.error;
+    // Tenta buscar do Supabase se estiver configurado e tiver OrgId
+    if (isConfigured && orgId && !orgId.startsWith('demo')) {
+      try {
+        const [transactionsRes, accountsRes] = await Promise.all([
+          supabase
+            .from('transactions')
+            .select('*')
+            .eq('organization_id', orgId)
+            .order('date', { ascending: false }),
+          supabase
+            .from('bank_accounts')
+            .select('*')
+            .eq('organization_id', orgId)
+        ]);
 
-    const transactions = transactionsRes.data as Transaction[];
-    const accounts = accountsRes.data as BankAccount[];
+        if (!transactionsRes.error && transactionsRes.data) {
+          transactions = transactionsRes.data as Transaction[];
+        }
+        if (!accountsRes.error && accountsRes.data) {
+          accounts = accountsRes.data as BankAccount[];
+        }
+      } catch (e) {
+        console.warn("Dashboard fallback para offline");
+        transactions = offlineService.get<Transaction[]>('transactions', []);
+        accounts = offlineService.get<BankAccount[]>('accounts', []);
+      }
+    } else {
+      // Modo Offline/Demo
+      transactions = offlineService.get<Transaction[]>('transactions', []);
+      accounts = offlineService.get<BankAccount[]>('accounts', []);
+    }
 
-    // Cálculos de KPIs
-    const periodIncome = transactions
+    // Filtra transações do período selecionado para os KPIs de performance
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate).getTime();
+    
+    const periodTransactions = transactions.filter(t => {
+      const tDate = new Date(t.date).getTime();
+      return tDate >= start && tDate <= end;
+    });
+
+    // Cálculos de KPIs do período
+    const periodIncome = periodTransactions
       .filter(t => t.type === TransactionType.INCOME && t.isPaid)
       .reduce((acc, t) => acc + Number(t.amount), 0);
 
-    const periodExpense = transactions
+    const periodExpense = periodTransactions
       .filter(t => t.type === TransactionType.EXPENSE && t.isPaid)
       .reduce((acc, t) => acc + Number(t.amount), 0);
 
@@ -64,25 +89,16 @@ export const dashboardService = {
     const profitMargin = periodIncome > 0 ? (netProfit / periodIncome) * 100 : 0;
 
     // Burn Rate (Média de gastos diários no período se negativo)
-    const days = Math.max(1, (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
+    const days = Math.max(1, (end - start) / (1000 * 60 * 60 * 24));
     const burnRate = netProfit < 0 ? Math.abs(netProfit) / (days / 30) : 0;
 
-    // Saldo Total (Independente do filtro de data)
-    // Nota: Em um sistema real, buscaríamos o saldo histórico no ponto inicial.
-    // Aqui calculamos saldo inicial + todas as transações pagas até hoje.
-    const allTransactionsRes = await supabase
-      .from('transactions')
-      .select('amount, type, is_paid, account_id, destination_account_id')
-      .eq('organization_id', orgId)
-      .eq('is_paid', true);
-    
-    const allTransactions = allTransactionsRes.data || [];
-    
+    // Saldo Total Consolidado (Baseado em todas as transações pagas)
     let totalBalance = accounts.reduce((acc, curr) => acc + Number(curr.initialBalance || 0), 0);
-    allTransactions.forEach(t => {
+    transactions.filter(t => t.isPaid).forEach(t => {
       const amt = Number(t.amount);
-      if (t.type === 'income') totalBalance += amt;
-      if (t.type === 'expense') totalBalance -= amt;
+      if (t.type === TransactionType.INCOME) totalBalance += amt;
+      if (t.type === TransactionType.EXPENSE) totalBalance -= amt;
+      // Transferências entre contas internas não alteram o saldo global consolidado
     });
 
     const metrics: DashboardMetrics = {
@@ -94,17 +110,17 @@ export const dashboardService = {
       burnRate,
       accountsPayable,
       accountsReceivable,
-      revenueGrowth: 0 // Requeriria comparação com período anterior
+      revenueGrowth: 0
     };
 
     // Estrutura DRE Simplificada
     const dre: DREItem[] = [
       { label: 'Receita Bruta', value: periodIncome, type: 'positive' },
-      { label: 'Custos Operacionais', value: periodExpense * 0.6, type: 'negative' }, // Mock de proporção para exemplo visual
-      { label: 'EBITDA', value: periodIncome - (periodExpense * 0.8), type: 'neutral' },
+      { label: 'Custos Variáveis', value: periodExpense * 0.4, type: 'negative' },
+      { label: 'Margem de Contribuição', value: periodIncome - (periodExpense * 0.4), type: 'neutral' },
       { label: 'Lucro Líquido', value: netProfit, type: netProfit >= 0 ? 'positive' : 'negative' }
     ];
 
-    return { metrics, dre, transactions };
+    return { metrics, dre, transactions: periodTransactions };
   }
 };
