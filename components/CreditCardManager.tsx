@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { CreditCard as CreditCardType, Transaction, TransactionType, TransactionStatus, ThemeColor, BankAccount } from '../types';
 import { 
-  CreditCard as CardIcon, Plus, Calendar, ShieldCheck, Trash2, 
+  CreditCard as CardIcon, Plus, Calendar, ShieldCheck, Trash2, Edit2,
   Receipt, CheckCircle2, Search, Wallet, X, Info, ShieldAlert, 
   CheckCircle, HelpCircle, RefreshCw, TrendingDown, AlertTriangle 
 } from 'lucide-react';
@@ -15,18 +15,20 @@ interface CreditCardManagerProps {
   onDeleteCard: (id: string) => void;
   onAddTransaction: (t: Transaction) => void;
   onUpdateTransaction: (t: Transaction) => void;
+  onUpdateCard?: (card: CreditCardType) => void;
   themeColor?: ThemeColor;
 }
 
 export const CreditCardManager: React.FC<CreditCardManagerProps> = ({ 
-  cards, transactions, accounts, onAddCard, onDeleteCard, onAddTransaction, onUpdateTransaction, themeColor = 'indigo' 
+  cards, transactions, accounts, onAddCard, onDeleteCard, onAddTransaction, onUpdateTransaction, onUpdateCard, themeColor = 'indigo' 
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
   const [auditCard, setAuditCard] = useState<CreditCardType | null>(null);
   const [paymentModal, setPaymentModal] = useState<CreditCardType | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState('');
 
-  // Form State para novo cartão
+  // Form State
   const [name, setName] = useState('');
   const [brand, setBrand] = useState<'visa' | 'mastercard' | 'elo' | 'amex'>('visa');
   const [limit, setLimit] = useState('');
@@ -66,25 +68,42 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
     onUpdateTransaction({ ...t, status });
   };
 
-  const handleAddCard = () => {
+  const openEditModal = (card: CreditCardType) => {
+    setEditingCard(card);
+    setName(card.name);
+    setBrand(card.brand);
+    setLimit(card.limit.toString());
+    setClosingDay(card.closingDay.toString());
+    setDueDay(card.dueDay.toString());
+  };
+
+  const handleSaveCard = () => {
     if (!name || !limit) return;
-    onAddCard({
-      id: Date.now().toString(),
+    
+    const cardData: CreditCardType = {
+      id: editingCard ? editingCard.id : Date.now().toString(),
       name,
       brand,
       limit: parseFloat(limit),
       usedLimit: 0,
       closingDay: parseInt(closingDay),
       dueDay: parseInt(dueDay),
-      color: 'from-indigo-600 to-blue-700',
-      accountId: ''
-    });
+      color: editingCard ? editingCard.color : 'from-indigo-600 to-blue-700',
+      accountId: editingCard ? editingCard.accountId : ''
+    };
+
+    if (editingCard) {
+      onUpdateCard?.(cardData);
+    } else {
+      onAddCard(cardData);
+    }
+
     setShowAddModal(false);
+    setEditingCard(null);
     setName('');
     setLimit('');
   };
 
-  // Cálculo de estatísticas de auditoria em tempo real
   const auditStats = useMemo(() => {
     if (!auditCard) return { total: 0, audited: 0, pending: 0, rejected: 0, count: 0, auditedCount: 0 };
     const items = transactions.filter(t => t.creditCardId === auditCard.id);
@@ -113,7 +132,7 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
             <p className="text-sm text-gray-500">Controle faturas, audite gastos e gerencie seus limites.</p>
           </div>
         </div>
-        <button onClick={() => setShowAddModal(true)} className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold shadow-lg transition active:scale-95`}>
+        <button onClick={() => { setEditingCard(null); setShowAddModal(true); }} className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold shadow-lg transition active:scale-95`}>
           <Plus size={18} /> Novo Cartão
         </button>
       </div>
@@ -131,8 +150,13 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
                       <p className="text-[10px] uppercase font-black tracking-widest opacity-60">Limite Disponível</p>
                       <h4 className="text-2xl font-black">R$ {(card.limit - spent).toLocaleString('pt-BR')}</h4>
                    </div>
-                   <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/20 text-[10px] font-black uppercase tracking-tighter">
-                      {card.brand}
+                   <div className="flex gap-2">
+                      <button onClick={() => openEditModal(card)} className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition">
+                        <Edit2 size={16} />
+                      </button>
+                      <button onClick={() => onDeleteCard(card.id)} className="p-2 bg-white/10 hover:bg-red-500/50 rounded-lg transition">
+                        <Trash2 size={16} />
+                      </button>
                    </div>
                 </div>
                 <div className="relative z-10 flex justify-between items-end">
@@ -173,7 +197,55 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
         })}
       </div>
 
-      {/* MODAL DE AUDITORIA MELHORADO */}
+      {/* MODAL ADICIONAR / EDITAR CARTÃO */}
+      {(showAddModal || editingCard) && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white dark:bg-[#1c2128] rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl border border-white/10">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">
+              {editingCard ? 'Editar Cartão' : 'Novo Cartão de Crédito'}
+            </h3>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identificação</label>
+                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Nubank Elite" className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Bandeira</label>
+                  <select value={brand} onChange={e => setBrand(e.target.value as any)} className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
+                    <option value="visa">Visa</option>
+                    <option value="mastercard">Mastercard</option>
+                    <option value="elo">Elo</option>
+                    <option value="amex">Amex</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Limite R$</label>
+                  <input type="number" value={limit} onChange={e => setLimit(e.target.value)} placeholder="0.00" className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dia Fechamento</label>
+                  <input type="number" value={closingDay} onChange={e => setClosingDay(e.target.value)} className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dia Vencimento</label>
+                  <input type="number" value={dueDay} onChange={e => setDueDay(e.target.value)} className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold" />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-4 mt-8">
+              <button onClick={() => { setShowAddModal(false); setEditingCard(null); }} className="flex-1 py-3.5 text-gray-500 font-bold">Cancelar</button>
+              <button onClick={handleSaveCard} className={`flex-1 py-3.5 bg-${themeColor}-600 text-white rounded-2xl font-black uppercase tracking-wider text-xs shadow-lg shadow-${themeColor}-600/20 active:scale-95 transition`}>
+                {editingCard ? 'Salvar Alterações' : 'Ativar Cartão'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE AUDITORIA (mantido igual) */}
       {auditCard && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white dark:bg-[#1c2128] rounded-[2.5rem] w-full max-w-3xl shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col max-h-[90vh] overflow-hidden">
@@ -224,7 +296,6 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
                 </div>
              </div>
 
-             {/* Lista de Gastos para Conferência */}
              <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar bg-white dark:bg-gray-900">
                 {transactions.filter(t => t.creditCardId === auditCard.id).length === 0 ? (
                   <div className="py-20 text-center text-gray-400">
@@ -290,7 +361,6 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
                 ))}
              </div>
              
-             {/* Rodapé do Modal */}
              <div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                     <Info size={16} className="text-indigo-500" />
@@ -304,51 +374,7 @@ export const CreditCardManager: React.FC<CreditCardManagerProps> = ({
         </div>
       )}
 
-      {/* MODAL ADICIONAR CARTÃO */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in">
-          <div className="bg-white dark:bg-[#1c2128] rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl border border-white/10">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Novo Cartão de Crédito</h3>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identificação</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Nubank Elite" className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Bandeira</label>
-                  <select value={brand} onChange={e => setBrand(e.target.value as any)} className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
-                    <option value="visa">Visa</option>
-                    <option value="mastercard">Mastercard</option>
-                    <option value="elo">Elo</option>
-                    <option value="amex">Amex</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Limite R$</label>
-                  <input type="number" value={limit} onChange={e => setLimit(e.target.value)} placeholder="0.00" className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dia Fechamento</label>
-                  <input type="number" value={closingDay} onChange={e => setClosingDay(e.target.value)} className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dia Vencimento</label>
-                  <input type="number" value={dueDay} onChange={e => setDueDay(e.target.value)} className="w-full p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold" />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-4 mt-8">
-              <button onClick={() => setShowAddModal(false)} className="flex-1 py-3.5 text-gray-500 font-bold">Descartar</button>
-              <button onClick={handleAddCard} className={`flex-1 py-3.5 bg-${themeColor}-600 text-white rounded-2xl font-black uppercase tracking-wider text-xs shadow-lg shadow-${themeColor}-600/20 active:scale-95 transition`}>Ativar Cartão</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL PAGAMENTO */}
+      {/* MODAL PAGAMENTO (mantido igual) */}
       {paymentModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in">
            <div className="bg-white dark:bg-[#1c2128] rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl border border-gray-100 dark:border-gray-800">

@@ -47,7 +47,7 @@ const App: React.FC = () => {
       setAccounts(a);
       setCategories(c);
       
-      // Simulação de cartões (pode ser expandido para o financialService se houver tabela)
+      // Simulação ou carregamento real de cartões
       const mockCards: CreditCardType[] = [
         { id: 'card-1', name: 'Nubank Gold', brand: 'mastercard', limit: 5000, usedLimit: 0, closingDay: 5, dueDay: 12, color: 'indigo', accountId: a[0]?.id || '' }
       ];
@@ -93,6 +93,15 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [initialize]);
 
+  const handleUpdateCard = async (card: CreditCardType) => {
+    if (!orgId) return;
+    try {
+      // Simulação de update no estado local enquanto não há tabela de cartões
+      setCards(prev => prev.map(c => c.id === card.id ? card : c));
+      // Se houvesse tabela real: await financialService.updateCreditCard(card, orgId);
+    } catch (e: any) { alert("Erro ao atualizar cartão: " + e.message); }
+  };
+
   const handleAddAccount = async (acc: BankAccount) => {
     if (!orgId) return;
     try {
@@ -110,7 +119,6 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTransaction = async (t: Transaction) => {
-    // Implementação simplificada de update
     setTransactions(prev => prev.map(item => item.id === t.id ? t : item));
   };
 
@@ -168,7 +176,7 @@ const App: React.FC = () => {
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={categories} />}
           {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransaction} onToggleStatus={()=>{}} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={()=>{}} onDeleteAccount={()=>{}} />}
-          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={(c) => setCards([...cards, c])} onDeleteCard={(id) => setCards(cards.filter(c => c.id !== id))} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransaction} />}
+          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={(c) => setCards([...cards, c])} onDeleteCard={(id) => setCards(cards.filter(c => c.id !== id))} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateCard={handleUpdateCard} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={()=>{}} />}
           {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor="indigo" transactions={transactions} />}
         </div>

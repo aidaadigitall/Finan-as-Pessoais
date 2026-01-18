@@ -1,8 +1,10 @@
 
 import { supabase } from '../lib/supabase';
-import { Transaction, BankAccount, Category, TransactionType, TransactionStatus } from '../types';
+import { Transaction, BankAccount, Category, TransactionType, TransactionStatus, CreditCard } from '../types';
 
 export const financialService = {
+  // ... (métodos anteriores mantidos)
+
   async getTransactions(orgId: string): Promise<Transaction[]> {
     try {
       const { data, error } = await supabase
@@ -113,7 +115,6 @@ export const financialService = {
   },
 
   async createCategory(cat: Partial<Category>, orgId: string): Promise<void> {
-    // IMPORTANTE: Removemos o ID temporário do frontend para o Supabase gerar um UUID válido
     const { error } = await supabase.from('categories').insert({
       name: cat.name,
       type: cat.type,
@@ -121,10 +122,22 @@ export const financialService = {
       budget_limit: cat.budgetLimit || 0,
       organization_id: orgId
     });
+    if (error) throw error;
+  },
+
+  async updateCreditCard(card: CreditCard, orgId: string): Promise<void> {
+    const { error } = await supabase
+      .from('credit_cards')
+      .update({
+        name: card.name,
+        brand: card.brand,
+        limit: card.limit,
+        closing_day: card.closingDay,
+        due_day: card.dueDay
+      })
+      .eq('id', card.id)
+      .eq('organization_id', orgId);
     
-    if (error) {
-      console.error("Supabase Category Error:", error);
-      throw error;
-    }
+    if (error) throw error;
   }
 };
