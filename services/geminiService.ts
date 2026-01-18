@@ -17,8 +17,35 @@ const cleanJsonString = (text: string): string => {
 };
 
 // ==========================================
-// CLIENTE OPENAI (FALLBACK)
+// CLIENTE OPENAI (FALLBACK + WHISPER)
 // ==========================================
+
+const transcribeAudioOpenAI = async (apiKey: string, audioFile: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append("file", audioFile);
+  formData.append("model", "whisper-1");
+
+  try {
+      const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || "Erro na transcrição de áudio OpenAI");
+      }
+
+      const data = await response.json();
+      return data.text;
+  } catch (error: any) {
+      throw new Error(`OpenAI Whisper Error: ${error.message}`);
+  }
+};
+
 const callOpenAI = async (apiKey: string, prompt: string | any[], systemInstruction: string, jsonMode: boolean = false) => {
     // Explicitly typed to allow string or array content for multimodal support
     const messages: { role: string; content: string | any[] }[] = [
@@ -126,7 +153,7 @@ export const analyzeFinancialInput = async (
 
     // --- LÓGICA DE SELEÇÃO DE PROVEDOR ---
 
-    // 1. Prioridade: Google Gemini (Mais rápido e barato para este uso)
+    // 1. Prioridade: Google Gemini (Mais rápido e barato para este uso, nativo para áudio)
     if (gemini) {
         const ai = new GoogleGenAI({ apiKey: gemini });
         const parts: any[] = [];
@@ -149,24 +176,36 @@ export const analyzeFinancialInput = async (
         return JSON.parse(cleanText);
     }
 
-    // 2. Fallback: OpenAI
+    // 2. Fallback: OpenAI (Com suporte a Whisper para áudio)
     if (openai) {
-        // Nota: OpenAI não suporta áudio nativo na API de chat padrão como o Gemini.
+        let promptParts: any[] = [];
+        let transcription = "";
+
+        // Processamento de Áudio (Whisper API)
         if (mediaFile && mediaFile.type.startsWith('audio/')) {
-            return {
-                isTransaction: false,
-                responseMessage: "Para processar áudios diretamente, por favor configure a chave do Google Gemini nas configurações. A OpenAI requer etapas extras para áudio."
-            };
+             try {
+                 transcription = await transcribeAudioOpenAI(openai, mediaFile);
+             } catch (e: any) {
+                 return { isTransaction: false, responseMessage: "Erro ao transcrever áudio com OpenAI: " + e.message };
+             }
         }
 
-        const parts: any[] = [];
-        if (textInput) parts.push({ text: textInput });
+        // Combinar texto do usuário com a transcrição
+        const fullText = [textInput, transcription].filter(Boolean).join("\n\n[TRANSCRIÇÃO DO ÁUDIO]:\n");
+        if (fullText) promptParts.push({ text: fullText });
+
+        // Processamento de Imagem (GPT-4o Vision)
         if (mediaFile && mediaFile.type.startsWith('image/')) {
             const base64Data = await fileToGenerativePart(mediaFile);
-            parts.push(base64Data);
+            promptParts.push(base64Data);
         }
 
-        const jsonResponse = await callOpenAI(openai, parts.length > 0 ? parts : "Analisar", systemPrompt, true);
+        // Se não houver conteúdo
+        if (promptParts.length === 0) {
+             return { isTransaction: false, responseMessage: "Não consegui identificar conteúdo na mensagem." };
+        }
+
+        const jsonResponse = await callOpenAI(openai, promptParts, systemPrompt, true);
         const cleanText = cleanJsonString(jsonResponse || "{}");
         return JSON.parse(cleanText);
     }
