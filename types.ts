@@ -76,6 +76,7 @@ export interface Transaction {
   destinationAccountId?: string;
   creditCardId?: string;
   reconciled?: boolean;
+  attachmentUrl?: string; // Novo campo para comprovante
   
   // Campos de Parcelamento
   installmentId?: string; // ID único que agrupa todas as parcelas

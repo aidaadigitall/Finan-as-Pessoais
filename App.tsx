@@ -203,8 +203,8 @@ const App: React.FC = () => {
           {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor="indigo" />}
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={categories} />}
           {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransaction} onToggleStatus={handleToggleStatus} />}
-          {currentView === 'payable' && <AccountsPayable transactions={transactions} onToggleStatus={handleToggleStatus} onOpenTransactionModal={() => setIsModalOpen(true)} />}
-          {currentView === 'receivable' && <AccountsReceivable transactions={transactions} onToggleStatus={handleToggleStatus} onOpenTransactionModal={() => setIsModalOpen(true)} />}
+          {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransaction} onOpenTransactionModal={() => setIsModalOpen(true)} />}
+          {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransaction} onOpenTransactionModal={() => setIsModalOpen(true)} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={()=>{}} onDeleteAccount={()=>{}} />}
           {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateCard={handleUpdateCard} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={()=>{}} />}
