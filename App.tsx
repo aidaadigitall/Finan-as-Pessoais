@@ -32,7 +32,9 @@ import {
   Settings as SettingsIcon,
   PieChart,
   Menu,
-  X
+  X,
+  Sparkles,
+  Heart
 } from 'lucide-react';
 import { Transaction, BankAccount, Category, CreditCard as CreditCardType, ThemeColor, AIRule } from './types';
 
@@ -46,7 +48,7 @@ const App: React.FC = () => {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>(() => offlineService.get('last_view', 'dashboard'));
   const [themeColor, setThemeColor] = useState<ThemeColor>(() => offlineService.get('theme_color', 'indigo'));
-  const [userName, setUserName] = useState(() => offlineService.get('user_name', 'Usuário'));
+  const [userName, setUserName] = useState(() => offlineService.get('user_name', 'Amigo(a)'));
   const [userPhone, setUserPhone] = useState(() => offlineService.get('user_phone', ''));
   const [aiRules, setAiRules] = useState<AIRule[]>(() => offlineService.get('ai_rules', []));
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -140,6 +142,13 @@ const App: React.FC = () => {
     window.location.reload();
   };
 
+  const getGreeting = () => {
+    const hours = new Date().getHours();
+    if (hours < 12) return 'Bom dia';
+    if (hours < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
   if (appState === 'BOOTING') return <LoadingScreen />;
   if (!session && !isDemoMode) return <Auth onAuthSuccess={(s) => setSession(s)} themeColor={themeColor} />;
 
@@ -149,13 +158,13 @@ const App: React.FC = () => {
         setCurrentView(view);
         if (window.innerWidth < 1024) setIsSidebarOpen(false);
       }}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 ${
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-300 transform active:scale-95 ${
         currentView === view 
-          ? `bg-${themeColor}-600 text-white shadow-lg` 
+          ? `bg-${themeColor}-600 text-white shadow-lg shadow-${themeColor}-600/20` 
           : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
       }`}
     >
-      <Icon size={20} />
+      <Icon size={18} />
       <span className="text-sm">{label}</span>
     </button>
   );
@@ -164,45 +173,54 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] overflow-hidden font-sans">
       <ConnectionGuard isOnline={appState === 'READY'} isDemoMode={isDemoMode} onRetry={() => { setIsDemoMode(false); initialize(); }} onContinueOffline={() => setIsDemoMode(true)} />
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#1c2128] border-r border-gray-100 dark:border-gray-800 p-6 flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#151a21] border-r border-gray-100 dark:border-gray-800 p-6 flex flex-col transition-all duration-500 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full shadow-none'}`}>
         <div className="mb-10 flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
-            <div className={`p-2 bg-${themeColor}-600 rounded-xl text-white shadow-lg`}><PieChart size={24}/></div>
+            <div className={`p-2 bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-700 rounded-xl text-white shadow-xl`}><PieChart size={24}/></div>
             <div>
               <span className="font-black text-xl tracking-tight dark:text-white leading-none block">FinAI</span>
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 block">Ledger Console</span>
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 block">Gestão Inteligente</span>
             </div>
           </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400"><X size={20} /></button>
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 p-2 hover:bg-gray-100 rounded-full transition"><X size={20} /></button>
         </div>
         <nav className="flex-1 space-y-1">
-          <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />
-          <NavItem icon={List} label="Lançamentos" view="transactions" />
-          <NavItem icon={Landmark} label="Contas (Real)" view="accounts" />
-          <NavItem icon={CreditCard} label="Crédito" view="cards" />
+          <NavItem icon={LayoutDashboard} label="Visão Geral" view="dashboard" />
+          <NavItem icon={List} label="Movimentações" view="transactions" />
+          <NavItem icon={Landmark} label="Minhas Contas" view="accounts" />
+          <NavItem icon={CreditCard} label="Cartões de Crédito" view="cards" />
           <NavItem icon={Tag} label="Categorias" view="categories" />
-          <div className="my-4 border-t border-gray-100 dark:border-gray-800 mx-2"></div>
-          <NavItem icon={MessageSquare} label="Auditore AI" view="chat" />
+          <div className="my-6 border-t border-gray-100 dark:border-gray-800 opacity-50 mx-2"></div>
+          <NavItem icon={MessageSquare} label="Conversar com IA" view="chat" />
         </nav>
-        <button onClick={handleLogout} className="mt-auto flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-all">
-          <LogOut size={20} /> Sair
+        
+        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl mb-4 border border-gray-100 dark:border-gray-800">
+           <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Dica do dia</p>
+           <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed italic">"O segredo da riqueza é gastar menos do que se ganha."</p>
+        </div>
+
+        <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 text-red-500/70 font-bold hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all">
+          <LogOut size={18} /> Sair com segurança
         </button>
       </aside>
 
       <main className="flex-1 overflow-y-auto relative bg-[#f8fafc] dark:bg-[#0b0e14]">
-        <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#1c2128]/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#151a21]/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center transition-all duration-300">
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500">
-              <Menu size={24} />
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-400 transition transform active:rotate-180">
+              <Menu size={22} />
             </button>
-            <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">{currentView}</h2>
+            <div className="hidden sm:block">
+              <h2 className="text-sm font-black text-gray-400 uppercase tracking-[0.2em]">{getGreeting()}, <span className={`text-${themeColor}-600 dark:text-${themeColor}-400`}>{userName}</span></h2>
+            </div>
           </div>
-          <button onClick={() => setIsModalOpen(true)} className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl font-black shadow-lg flex items-center gap-2 transition-all active:scale-95`}>
-            <Plus size={20}/> Novo Lançamento
+          <button onClick={() => setIsModalOpen(true)} className={`group relative bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-6 py-3 rounded-2xl font-black shadow-xl shadow-${themeColor}-600/20 flex items-center gap-2 transition-all active:scale-95 overflow-hidden`}>
+            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+            <Plus size={20}/> <span className="hidden sm:inline">Lançamento</span>
           </button>
         </header>
 
-        <div className="p-6 lg:p-8">
+        <div className="p-6 lg:p-10 max-w-7xl mx-auto">
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor={themeColor} categories={categories} />}
           {currentView === 'transactions' && (
             <TransactionList transactions={transactions} categories={categories} accounts={accountsWithComputedBalances} 
@@ -237,11 +255,60 @@ const App: React.FC = () => {
   );
 };
 
-const LoadingScreen = () => (
-  <div className="h-screen flex flex-col items-center justify-center bg-[#0b141a] text-white gap-6">
-    <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-    <div className="text-center"><h2 className="text-xl font-bold text-indigo-400 tracking-tight">Ledger Engine</h2><p className="text-sm text-gray-500">Iniciando ambiente seguro...</p></div>
-  </div>
-);
+const LoadingScreen = () => {
+  const [quoteIdx, setQuoteIdx] = useState(0);
+  const quotes = [
+    "Preparando sua liberdade financeira...",
+    "Sincronizando seus sonhos com a realidade...",
+    "Organizando cada centavo para você...",
+    "Carregando seu futuro próspero...",
+    "Deixando tudo pronto e seguro..."
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setQuoteIdx(prev => (prev + 1) % quotes.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="h-screen flex flex-col items-center justify-center bg-[#0b0e14] text-white p-6 relative overflow-hidden">
+      {/* Decorative Blur */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse"></div>
+      
+      <div className="relative flex flex-col items-center gap-8 text-center animate-in fade-in duration-1000">
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+             <Heart size={24} className="text-indigo-500 animate-pulse" />
+          </div>
+        </div>
+        
+        <div className="space-y-3">
+          <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+            FinAI <Sparkles size={20} className="text-indigo-400" />
+          </h2>
+          <div className="h-6 flex items-center justify-center">
+            <p className="text-sm text-gray-400 animate-in fade-in slide-in-from-bottom-2 duration-700 font-medium" key={quoteIdx}>
+              {quotes[quoteIdx]}
+            </p>
+          </div>
+        </div>
+        
+        <div className="w-48 h-1 bg-gray-800 rounded-full overflow-hidden mt-4">
+           <div className="h-full bg-indigo-500 w-1/2 animate-[loading-bar_3s_infinite_ease-in-out]"></div>
+        </div>
+        <style>{`
+          @keyframes loading-bar {
+            0% { transform: translateX(-100%); width: 30%; }
+            50% { width: 70%; }
+            100% { transform: translateX(200%); width: 30%; }
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+};
 
 export default App;
