@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { QrCode, Smartphone, Wifi, WifiOff, MessageSquare, Send, Loader2, CheckCircle2, AlertCircle, Server, Key, Globe, Copy, ExternalLink, Save } from 'lucide-react';
 import { WhatsAppConfig, ThemeColor } from '../types';
@@ -20,6 +21,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
   const [simulationText, setSimulationText] = useState('');
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationStatus, setSimulationStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [lastResponse, setLastResponse] = useState<string | null>(null);
   
   // Settings State
   const [gatewayUrl, setGatewayUrl] = useState('https://api.seusaas.com/evolution');
@@ -32,11 +34,12 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     
     setIsSimulating(true);
     setSimulationStatus('idle');
+    setLastResponse(null);
     try {
+      // Aqui a App.tsx vai processar e retornar o que a IA responderia
       await onSimulateMessage(simulationText);
       setSimulationStatus('success');
       setSimulationText('');
-      setTimeout(() => setSimulationStatus('idle'), 4000);
     } catch (error) {
       setSimulationStatus('error');
     } finally {
@@ -63,7 +66,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
   const getThemeBorder = () => `border-${themeColor}-200`;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       
       {/* Top Section: Connection Status & Gateway Config */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -93,12 +96,14 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
 
             {config.status === 'disconnected' ? (
               <div className="flex flex-col items-center justify-center py-4">
-                <div className={`w-48 h-48 bg-white p-2 rounded-xl border-2 ${getThemeBorder()} mb-4 flex items-center justify-center`}>
+                <div className={`w-48 h-48 bg-white p-2 rounded-xl border-2 ${getThemeBorder()} mb-4 flex items-center justify-center relative`}>
                    <QrCode size={150} className="text-gray-800" />
+                   <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+                      <span className="text-xs font-bold text-gray-500">QR Code (Simulado)</span>
+                   </div>
                 </div>
-                {/* FIX: Escaped > characters with &gt; to prevent build errors */}
                 <p className="text-sm text-gray-500 mb-6 text-center max-w-xs">
-                  Abra o WhatsApp &gt; Aparelhos Conectados &gt; Conectar Aparelho e escaneie o código.
+                  Para conectar, configure o Gateway ao lado e escaneie o código no seu WhatsApp.
                 </p>
               </div>
             ) : (
@@ -121,7 +126,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
              onClick={config.status === 'disconnected' ? onConnect : onDisconnect}
              className={`w-full ${config.status === 'disconnected' ? getThemeBg() : 'bg-red-500 hover:bg-red-600'} text-white px-6 py-3 rounded-lg hover:opacity-90 transition font-medium flex items-center justify-center gap-2`}
           >
-             {config.status === 'disconnected' ? 'Gerar QR Code (Simulado)' : 'Desconectar Sessão'}
+             {config.status === 'disconnected' ? 'Gerar QR Code (Simular Conexão)' : 'Desconectar Sessão'}
           </button>
         </div>
 
@@ -214,86 +219,73 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
       {/* Simulator Section */}
       <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between mb-4">
-             <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <MessageSquare className={getThemeText()} />
-                Simulador de Webhook (Teste a IA)
-             </h3>
-             <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-md border border-orange-200">
+             <div>
+                 <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    <MessageSquare className={getThemeText()} />
+                    Simulador de Webhook (Teste a IA)
+                 </h3>
+                 <p className="text-xs text-gray-500 mt-1">
+                     Teste como a IA responderá às mensagens recebidas via WhatsApp sem precisar configurar o gateway real.
+                 </p>
+             </div>
+             <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-md border border-orange-200 font-bold">
                 Ambiente de Teste
              </span>
           </div>
           
           <div className="flex flex-col md:flex-row gap-6">
-             <div className="flex-1">
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                  Como não temos um backend Node.js ativo neste ambiente de demonstração, use este campo para simular o <strong>payload JSON</strong> que o Evolution API enviaria para o seu sistema.
-                </p>
-                <div className="relative">
+             <div className="flex-1 flex flex-col">
+                <div className="relative flex-1">
                     <textarea
                       value={simulationText}
                       onChange={(e) => setSimulationText(e.target.value)}
-                      placeholder="Digite como se fosse no WhatsApp: 'Gastei 120 reais no mercado hoje'"
-                      className="w-full p-4 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-opacity-50 min-h-[100px] resize-none shadow-sm"
+                      placeholder="Digite como se estivesse no WhatsApp:&#10;'Gastei 120 reais no mercado hoje'&#10;'Como está meu saldo?'"
+                      className="w-full h-full min-h-[140px] p-4 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none shadow-sm font-medium"
                       style={{ '--tw-ring-color': `var(--${themeColor}-500)` } as any}
-                      disabled={config.status === 'disconnected'}
                     />
-                </div>
-                
-                {/* Visual Status Feedback */}
-                <div className="mt-4 min-h-[50px]">
-                    {simulationStatus === 'success' && (
-                        <div className="flex items-center gap-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 text-green-700 dark:text-green-300 p-3 rounded-lg animate-in fade-in slide-in-from-top-2">
-                            <div className="bg-green-100 dark:bg-green-800 p-1 rounded-full">
-                                <CheckCircle2 size={18} />
-                            </div>
-                            <div className="flex-1">
-                                <p className="font-medium text-sm">Webhook processado com sucesso!</p>
-                                <p className="text-xs opacity-90">A transação foi identificada e adicionada ao diário.</p>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {simulationStatus === 'error' && (
-                         <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-700 dark:text-red-300 p-3 rounded-lg animate-in fade-in slide-in-from-top-2">
-                            <div className="bg-red-100 dark:bg-red-800 p-1 rounded-full">
-                                <AlertCircle size={18} />
-                            </div>
-                            <div className="flex-1">
-                                <p className="font-medium text-sm">Falha no processamento.</p>
-                                <p className="text-xs opacity-90">Verifique a conexão ou tente novamente.</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {simulationStatus === 'idle' && (
-                        <div className="flex justify-end">
-                            <button
+                    <div className="absolute bottom-3 right-3">
+                         <button
                             onClick={handleSimulate}
-                            disabled={isSimulating || !simulationText.trim() || config.status === 'disconnected'}
-                            className={`${getThemeBg()} text-white px-5 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2 shadow-md`}
+                            disabled={isSimulating || !simulationText.trim()}
+                            className={`${getThemeBg()} text-white px-4 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2 shadow-md text-sm font-bold`}
                             >
-                            {isSimulating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                            Disparar Evento
-                            </button>
-                        </div>
-                    )}
+                            {isSimulating ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                            Enviar Mensagem
+                        </button>
+                    </div>
                 </div>
              </div>
 
-             <div className="w-full md:w-1/3 bg-gray-900 rounded-xl p-4 text-xs font-mono text-gray-300 overflow-hidden relative">
-                <div className="absolute top-0 left-0 w-full h-8 bg-gray-800 flex items-center px-4 border-b border-gray-700">
+             <div className="w-full md:w-1/3 bg-gray-900 rounded-xl p-4 text-xs font-mono text-gray-300 overflow-hidden relative min-h-[200px] flex flex-col">
+                <div className="absolute top-0 left-0 w-full h-8 bg-gray-800 flex items-center justify-between px-4 border-b border-gray-700">
                    <span className="text-gray-400">log_terminal</span>
+                   <div className="flex gap-1.5">
+                       <div className="w-2.5 h-2.5 rounded-full bg-red-500"/>
+                       <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"/>
+                       <div className="w-2.5 h-2.5 rounded-full bg-green-500"/>
+                   </div>
                 </div>
-                <div className="mt-6 space-y-2 opacity-80">
-                   <p><span className="text-green-400">POST</span> /api/webhook/whatsapp</p>
-                   <p className="text-blue-300">{`{`}</p>
-                   <p className="pl-4 text-blue-300">{`"event": "messages.upsert",`}</p>
-                   <p className="pl-4 text-blue-300">{`"data": {`}</p>
-                   <p className="pl-8 text-yellow-300">{`"body": "${simulationText || '...'}",`}</p>
-                   <p className="pl-8 text-yellow-300">{`"from": "${config.phoneNumber || '...'}"`}</p>
-                   <p className="pl-4 text-blue-300">{`}`}</p>
-                   <p className="text-blue-300">{`}`}</p>
-                   {isSimulating && <p className="text-gray-400 animate-pulse">Processing by Gemini AI...</p>}
+                <div className="mt-8 space-y-2 opacity-90 overflow-y-auto custom-scrollbar flex-1">
+                   {isSimulating ? (
+                       <>
+                           <p><span className="text-green-400">POST</span> /api/webhook/whatsapp</p>
+                           <p className="text-blue-300">{`{ "event": "messages.upsert", ... }`}</p>
+                           <p className="text-yellow-300 animate-pulse">Processing by Gemini AI...</p>
+                       </>
+                   ) : simulationStatus === 'success' ? (
+                        <>
+                           <p className="text-gray-500">// Mensagem recebida</p>
+                           <p className="text-white">User: "{simulationText || '...'}"</p>
+                           <div className="my-2 border-t border-gray-800"></div>
+                           <p className="text-gray-500">// Resposta da IA</p>
+                           <p className="text-green-400">FinAI: Processamento concluído.</p>
+                           <p className="text-indigo-300">Ação: Lançamento/Consulta executada.</p>
+                        </>
+                   ) : simulationStatus === 'error' ? (
+                       <p className="text-red-400">Error: Failed to process message.</p>
+                   ) : (
+                       <p className="text-gray-500 italic">Aguardando evento...</p>
+                   )}
                 </div>
              </div>
           </div>

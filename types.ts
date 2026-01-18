@@ -106,6 +106,8 @@ export interface WhatsAppConfig {
   status: 'connected' | 'disconnected';
   phoneNumber?: string;
   instanceId?: string;
+  gatewayUrl?: string;
+  apiKey?: string;
 }
 
 export interface ApiKeysConfig {

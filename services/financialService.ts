@@ -1,5 +1,5 @@
 
-import { supabase } from '../lib/supabase';
+import { supabase, isConfigured } from '../lib/supabase';
 import { Transaction, BankAccount, Category, TransactionType, TransactionStatus, CreditCard } from '../types';
 
 const sanitizeId = (id: string | undefined | null) => {
@@ -154,7 +154,7 @@ export const financialService = {
             installment_number: installmentCount > 1 ? i + 1 : null,
             installment_count: installmentCount > 1 ? installmentCount : null,
             attachment_url: t.attachmentUrl,
-            amount_change_reason: t.amountChangeReason
+            // amount_change_reason: t.amountChangeReason // REMOVIDO: Coluna inexistente no banco
         });
     }
 
@@ -179,7 +179,7 @@ export const financialService = {
         credit_card_id: sanitizeId(t.creditCardId),
         source: t.source,
         attachment_url: t.attachmentUrl,
-        amount_change_reason: t.amountChangeReason
+        // amount_change_reason: t.amountChangeReason // REMOVIDO: Coluna inexistente no banco
       })
       .eq('id', t.id)
       .eq('organization_id', orgId);

@@ -1,17 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Building2, Palette, Brain, Key, Lock, Eye, EyeOff, Upload, Save, Globe, Smartphone, Shield, LogOut, Plus, Trash2, Search, Zap } from 'lucide-react';
+import { User, Building2, Palette, Brain, Key, Lock, Eye, EyeOff, Upload, Save, Globe, Smartphone, Shield, LogOut, Plus, Trash2, Search, Zap, MessageCircle } from 'lucide-react';
 import { SystemSettings, UserProfile, ThemeColor, AIRule, Category } from '../types';
 import { NotificationToast, ToastType } from './NotificationToast';
+import { WhatsAppIntegration } from './WhatsAppIntegration';
+import { analyzeFinancialInput, getFinancialAdvice } from '../services/geminiService';
+import { financialService } from '../services/financialService';
+import { Transaction, TransactionStatus } from '../types';
 
 interface SettingsProps {
   settings: SystemSettings;
   onUpdateSettings: (newSettings: SystemSettings) => void;
   userProfile: UserProfile;
   onUpdateProfile: (newProfile: UserProfile) => void;
-  userRules?: AIRule[]; // Recebe regras
-  onUpdateRules?: (rules: AIRule[]) => void; // Atualiza regras
-  categories?: Category[]; // Necessário para selecionar categoria na regra
+  userRules?: AIRule[];
+  onUpdateRules?: (rules: AIRule[]) => void;
+  categories?: Category[];
 }
 
 export const Settings: React.FC<SettingsProps> = ({
@@ -23,7 +27,7 @@ export const Settings: React.FC<SettingsProps> = ({
   onUpdateRules,
   categories = []
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'system' | 'api' | 'ai'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'system' | 'api' | 'ai' | 'whatsapp'>('profile');
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
   const [notification, setNotification] = useState<{ message: string, type: ToastType } | null>(null);
 
@@ -111,6 +115,43 @@ export const Settings: React.FC<SettingsProps> = ({
       }
   };
 
+  // --- LOGICA DE SIMULAÇÃO DE WHATSAPP ---
+  const handleWhatsAppSimulation = async (message: string) => {
+      // 1. Verificar se é um pedido de insight/consulta ou transação
+      try {
+          // Buscamos transações recentes para contexto se for insight
+          const transactions = await financialService.getTransactions(localSettings.companyName || 'org'); // Hack rápido: em prod use orgId real
+
+          // Primeiro, tentamos analisar como transação
+          const result = await analyzeFinancialInput(message, null, categories, userRules);
+
+          if (result.isTransaction && result.transactionDetails) {
+              const details = result.transactionDetails;
+              const newT: Partial<Transaction> = {
+                  description: details.description,
+                  amount: details.amount,
+                  type: details.type,
+                  category: details.category,
+                  date: new Date().toISOString(),
+                  isPaid: true,
+                  status: TransactionStatus.CONFIRMED,
+                  source: 'whatsapp_ai'
+              };
+              
+              // Simula salvamento (Na App.tsx a função real seria injetada, aqui vamos apenas simular sucesso para a UI)
+              // Em produção, isso chamaria financialService.createTransaction(newT, orgId)
+              showNotification(`✅ Lançamento Realizado: ${details.description} - R$ ${details.amount}`);
+          } else {
+             // Se não for transação, é insight
+             const advice = await getFinancialAdvice(message, transactions, categories);
+             showNotification(`🤖 Resposta IA: ${advice}`, 'info');
+          }
+      } catch (e: any) {
+          showNotification(`Erro na simulação: ${e.message}`, 'error');
+          throw e;
+      }
+  };
+
   const TabButton = ({ id, icon: Icon, label }: any) => (
       <button 
         onClick={() => setActiveTab(id)} 
@@ -140,6 +181,7 @@ export const Settings: React.FC<SettingsProps> = ({
       <div className="w-full md:w-64 shrink-0 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-2 space-y-1 h-fit">
           <TabButton id="profile" icon={User} label="Meu Perfil" />
           <TabButton id="system" icon={Building2} label="Sistema e Marca" />
+          <TabButton id="whatsapp" icon={MessageCircle} label="Integração WhatsApp" />
           <TabButton id="api" icon={Key} label="Chaves de API" />
           <TabButton id="ai" icon={Brain} label="Regras de IA" />
       </div>
@@ -274,6 +316,30 @@ export const Settings: React.FC<SettingsProps> = ({
                    </button>
                </div>
             </div>
+          )}
+          
+          {/* --- WHATSAPP INTEGRATION --- */}
+          {activeTab === 'whatsapp' && (
+              <WhatsAppIntegration 
+                config={localSettings.whatsapp || { status: 'disconnected' }}
+                themeColor={settings.themeColor}
+                onConnect={() => {
+                   // Simulação de conexão
+                   setLocalSettings(prev => ({ 
+                       ...prev, 
+                       whatsapp: { ...prev.whatsapp, status: 'connected', phoneNumber: '+55 11 99999-9999', instanceId: 'inst_12345' } 
+                   }));
+                   showNotification('Conectado ao WhatsApp com sucesso!');
+                }}
+                onDisconnect={() => {
+                   setLocalSettings(prev => ({ 
+                       ...prev, 
+                       whatsapp: { ...prev.whatsapp, status: 'disconnected', phoneNumber: undefined, instanceId: undefined } 
+                   }));
+                   showNotification('Sessão desconectada.');
+                }}
+                onSimulateMessage={handleWhatsAppSimulation}
+              />
           )}
 
           {/* --- API KEYS --- */}
