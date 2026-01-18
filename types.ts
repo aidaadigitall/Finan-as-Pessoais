@@ -55,6 +55,7 @@ export interface Category {
   name: string;
   type: CategoryType;
   budgetLimit?: number;
+  parentId?: string; // ID da categoria pai para subcategorias
 }
 
 export interface Transaction {
@@ -65,6 +66,7 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   category: string;
+  categoryId?: string; // Recomendado para links precisos com subcategorias
   status: TransactionStatus;
   isPaid: boolean;
   source: 'whatsapp_ai' | 'manual' | 'import';

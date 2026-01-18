@@ -14,7 +14,7 @@ interface ErrorBoundaryState {
 
 // Fixed class definition to include generic types for props and state
 // This ensures that this.state and this.props are correctly typed and accessible.
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType, TransactionStatus, Category, BankAccount, CreditCard } from '../types';
 import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, DollarSign, Tag, Landmark, Save, CreditCard as CardIcon } from 'lucide-react';
 
@@ -40,10 +40,28 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   }, [isOpen, accounts]);
 
+  // Organiza categorias hierarquicamente para o select
+  const organizedCategories = useMemo(() => {
+    const filtered = categories.filter(c => c.type === type || c.type === 'both');
+    const parents = filtered.filter(c => !c.parentId);
+    const subs = filtered.filter(c => !!c.parentId);
+    
+    const result: { id: string, name: string, isSub: boolean }[] = [];
+    parents.forEach(p => {
+        result.push({ id: p.id, name: p.name, isSub: false });
+        subs.filter(s => s.parentId === p.id).forEach(s => {
+            // Fixed: Removed fullName property which was not in the type definition
+            result.push({ id: s.id, name: `↳ ${s.name}`, isSub: true });
+        });
+    });
+    return result;
+  }, [categories, type]);
+
   const handleSave = () => {
       if (!description || !amount) return;
-      if (originType === 'account' && !accountId) return;
-      if (originType === 'card' && !creditCardId) return;
+      
+      // Encontra o nome real da categoria (removendo a seta se for sub)
+      const selectedCat = categories.find(c => c.id === categoryId);
 
       const newTransaction: Transaction = {
           id: 'temp-' + Date.now(),
@@ -51,9 +69,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           description,
           amount: parseFloat(amount),
           type,
-          category: type === TransactionType.TRANSFER ? 'Transferência' : categoryId,
+          category: type === TransactionType.TRANSFER ? 'Transferência' : (selectedCat?.name || 'Outros'),
           status: TransactionStatus.CONFIRMED,
-          isPaid: originType === 'card' ? true : isPaid, // No cartão é sempre efetivado no limite
+          isPaid: originType === 'card' ? true : isPaid,
           source: 'manual',
           accountId: originType === 'account' ? accountId : undefined,
           creditCardId: originType === 'card' ? creditCardId : undefined,
@@ -96,7 +114,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                         <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none" />
                         <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
                             <option value="">Categoria</option>
-                            {categories.filter(c => c.type === type || c.type === 'both').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            {organizedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                     </div>
 
