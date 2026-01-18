@@ -59,21 +59,25 @@ export const authService = {
 
     if (membership) return membership.organization_id;
 
-    // 3. Criar Organização
-    // Importante: Verifique se no Supabase existe a política de INSERT para a tabela organizations
+    // 3. Criar Organização com SLUG (Necessário para seu banco de dados)
+    const emailPrefix = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    const uniqueSlug = `${emailPrefix}-${Math.random().toString(36).substring(2, 7)}`;
     const orgName = `Empresa de ${email.split('@')[0]}`;
+
     const { data: org, error: orgError } = await supabase
       .from('organizations')
       .insert({ 
         name: orgName, 
-        owner_id: userId 
+        owner_id: userId,
+        slug: uniqueSlug // ADICIONADO PARA CORRIGIR O ERRO
       })
       .select()
       .single();
 
     if (orgError) {
       console.error("Erro ao criar organização:", orgError);
-      // Fallback: Tenta buscar uma organização onde ele já seja dono mas não membro (raro)
+      
+      // Fallback: Verificar se já existe uma org deste owner
       const { data: ownedOrg } = await supabase
         .from('organizations')
         .select('id')
@@ -81,7 +85,8 @@ export const authService = {
         .maybeSingle();
       
       if (ownedOrg) {
-         await supabase.from('organization_members').insert({
+         // Garantir que ele seja membro da org que ele já é dono
+         await supabase.from('organization_members').upsert({
             organization_id: ownedOrg.id,
             user_id: userId,
             role: 'owner'
