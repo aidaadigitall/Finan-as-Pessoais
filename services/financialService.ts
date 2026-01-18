@@ -48,7 +48,7 @@ export const financialService = {
       return (data || []).map(acc => ({
         id: acc.id,
         name: acc.name,
-        bankName: acc.bank_name || acc.name, // Fallback caso a coluna falhe
+        bankName: acc.bank_name || acc.name,
         initialBalance: Number(acc.initial_balance),
         currentBalance: Number(acc.current_balance),
         color: acc.color,
@@ -81,6 +81,32 @@ export const financialService = {
     }
   },
 
+  async getCreditCards(orgId: string): Promise<CreditCard[]> {
+    try {
+      const { data, error } = await supabase
+        .from('credit_cards')
+        .select('*')
+        .eq('organization_id', orgId);
+      
+      if (error) throw error;
+
+      return (data || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        brand: c.brand,
+        limit: Number(c.limit),
+        usedLimit: 0, // Calculado via transações no front ou outra query
+        closingDay: c.closing_day,
+        dueDay: c.due_day,
+        color: c.color || 'indigo',
+        accountId: c.account_id
+      }));
+    } catch (e) {
+      console.error("Erro ao carregar cartões:", e);
+      return [];
+    }
+  },
+
   async createTransaction(t: Partial<Transaction>, orgId: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
@@ -89,21 +115,17 @@ export const financialService = {
     const installmentCount = t.installmentCount && t.installmentCount > 1 ? t.installmentCount : 1;
     const installmentId = installmentCount > 1 ? crypto.randomUUID() : null;
     const baseDate = new Date(t.date || new Date().toISOString());
-    // Se for parcelado, o valor total é dividido, OU o usuário inseriu o valor da parcela. 
-    // Assumiremos aqui que o modal envia o VALOR DA PARCELA já calculado ou o usuário inseriu o valor mensal.
-    // Se quiséssemos dividir o total: const amountPerInstallment = t.amount! / installmentCount;
     const amount = t.amount; 
 
     for (let i = 0; i < installmentCount; i++) {
         const currentDate = new Date(baseDate);
         currentDate.setMonth(baseDate.getMonth() + i);
         
-        // Ajuste para datas de vencimento no final do mês (ex: 31 de Jan -> 28 de Fev)
         if (currentDate.getDate() !== baseDate.getDate()) {
             currentDate.setDate(0);
         }
 
-        const isPaid = i === 0 ? t.isPaid : false; // Geralmente só a primeira parcela é paga na hora, o resto é futuro
+        const isPaid = i === 0 ? t.isPaid : false;
 
         transactionsToInsert.push({
             description: installmentCount > 1 ? `${t.description} (${i + 1}/${installmentCount})` : t.description,
@@ -145,10 +167,7 @@ export const financialService = {
       .from('bank_accounts')
       .insert(payload);
 
-    if (error) {
-      console.error("Erro detalhado Supabase (bank_accounts):", error);
-      throw new Error(`Erro ao criar conta: ${error.message}`);
-    }
+    if (error) throw error;
   },
 
   async createCategory(cat: Partial<Category>, orgId: string): Promise<void> {
@@ -165,6 +184,23 @@ export const financialService = {
     if (error) throw error;
   },
 
+  async createCreditCard(card: Partial<CreditCard>, orgId: string): Promise<void> {
+    const { error } = await supabase
+      .from('credit_cards')
+      .insert({
+        name: card.name,
+        brand: card.brand,
+        limit: card.limit,
+        closing_day: card.closingDay,
+        due_day: card.dueDay,
+        color: card.color,
+        account_id: card.accountId, // Pode ser null
+        organization_id: orgId
+      });
+    
+    if (error) throw error;
+  },
+
   async updateCreditCard(card: CreditCard, orgId: string): Promise<void> {
     const { error } = await supabase
       .from('credit_cards')
@@ -173,11 +209,21 @@ export const financialService = {
         brand: card.brand,
         limit: card.limit,
         closing_day: card.closingDay,
-        due_day: card.dueDay
+        due_day: card.dueDay,
+        color: card.color,
+        account_id: card.accountId
       })
       .eq('id', card.id)
       .eq('organization_id', orgId);
     
+    if (error) throw error;
+  },
+
+  async deleteCreditCard(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('credit_cards')
+      .delete()
+      .eq('id', id);
     if (error) throw error;
   }
 };

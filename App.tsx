@@ -41,19 +41,16 @@ const App: React.FC = () => {
 
   const loadData = useCallback(async (id: string) => {
     try {
-      const [t, a, c] = await Promise.all([
+      const [t, a, c, crd] = await Promise.all([
         financialService.getTransactions(id),
         financialService.getBankAccounts(id),
-        financialService.getCategories(id)
+        financialService.getCategories(id),
+        financialService.getCreditCards(id)
       ]);
       setTransactions(t);
       setAccounts(a);
       setCategories(c);
-      
-      const mockCards: CreditCardType[] = [
-        { id: 'card-1', name: 'Nubank Gold', brand: 'mastercard', limit: 5000, usedLimit: 0, closingDay: 5, dueDay: 12, color: 'indigo', accountId: a[0]?.id || '' }
-      ];
-      setCards(mockCards);
+      setCards(crd);
       
       setAppState('READY');
     } catch (e: any) {
@@ -95,11 +92,28 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [initialize]);
 
+  const handleAddCard = async (card: CreditCardType) => {
+    if (!orgId) return;
+    try {
+      await financialService.createCreditCard(card, orgId);
+      await loadData(orgId);
+    } catch (e: any) { alert("Erro ao criar cartão: " + e.message); }
+  };
+
   const handleUpdateCard = async (card: CreditCardType) => {
     if (!orgId) return;
     try {
-      setCards(prev => prev.map(c => c.id === card.id ? card : c));
+      await financialService.updateCreditCard(card, orgId);
+      await loadData(orgId);
     } catch (e: any) { alert("Erro ao atualizar cartão: " + e.message); }
+  };
+
+  const handleDeleteCard = async (id: string) => {
+    if (!orgId) return;
+    try {
+      await financialService.deleteCreditCard(id);
+      await loadData(orgId);
+    } catch (e: any) { alert("Erro ao excluir cartão: " + e.message); }
   };
 
   const handleAddAccount = async (acc: BankAccount) => {
@@ -119,6 +133,8 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTransaction = async (t: Transaction) => {
+    // Para updates completos, idealmente teríamos um método updateTransaction no service
+    // Por enquanto atualizamos localmente para refletir na UI
     setTransactions(prev => prev.map(item => item.id === t.id ? t : item));
   };
 
@@ -132,7 +148,6 @@ const App: React.FC = () => {
   
   const handleToggleStatus = async (id: string) => {
       // Simulação de toggle status com persistência local rápida
-      // Em produção, isso chamaria uma service que atualiza no Supabase
       setTransactions(prev => prev.map(t => {
           if (t.id === id) return { ...t, isPaid: !t.isPaid, status: !t.isPaid ? TransactionStatus.CONFIRMED : TransactionStatus.PENDING_AUDIT };
           return t;
@@ -191,7 +206,7 @@ const App: React.FC = () => {
           {currentView === 'payable' && <AccountsPayable transactions={transactions} onToggleStatus={handleToggleStatus} onOpenTransactionModal={() => setIsModalOpen(true)} />}
           {currentView === 'receivable' && <AccountsReceivable transactions={transactions} onToggleStatus={handleToggleStatus} onOpenTransactionModal={() => setIsModalOpen(true)} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={()=>{}} onDeleteAccount={()=>{}} />}
-          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={(c) => setCards([...cards, c])} onDeleteCard={(id) => setCards(cards.filter(c => c.id !== id))} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateCard={handleUpdateCard} />}
+          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateCard={handleUpdateCard} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={()=>{}} />}
           {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor="indigo" transactions={transactions} />}
         </div>
