@@ -4,11 +4,12 @@ import { supabase, isConfigured } from './lib/supabase';
 import { authService } from './services/authService';
 import { financialService } from './services/financialService';
 import { offlineService } from './services/offlineService';
-import { settingsService } from './services/settingsService'; // Novo serviço
+import { settingsService } from './services/settingsService';
 
 import { ExecutiveDashboard } from './components/ExecutiveDashboard';
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
+import { TransferList } from './components/TransferList'; // Novo componente
 import { TransactionModal } from './components/TransactionModal';
 import { BankAccountManager } from './components/BankAccountManager';
 import { CategoryManager } from './components/CategoryManager';
@@ -19,16 +20,17 @@ import { AccountsPayable } from './components/AccountsPayable';
 import { AccountsReceivable } from './components/AccountsReceivable';
 import { ConfirmationModal, CustomAction } from './components/ConfirmationModal';
 import { Settings } from './components/Settings';
+import { NotificationToast, ToastType } from './components/NotificationToast'; // Componente de Notificação
 
 import { 
   LayoutDashboard, List, Landmark, LogOut, Plus, 
   CreditCard, Tag, MessageSquare, Menu, Loader2, AlertTriangle, RefreshCw, Briefcase,
-  TrendingDown, TrendingUp, Settings as SettingsIcon, Layers, Trash2
+  TrendingDown, TrendingUp, Settings as SettingsIcon, Layers, Trash2, ArrowRightLeft
 } from 'lucide-react';
 import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus, SystemSettings, UserProfile, AIRule } from './types';
 
 type AppState = 'BOOTING' | 'AUTH_REQUIRED' | 'LOADING_DATA' | 'READY' | 'CRITICAL_ERROR';
-type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'payable' | 'receivable' | 'settings';
+type View = 'executive' | 'dashboard' | 'transactions' | 'transfers' | 'accounts' | 'cards' | 'categories' | 'chat' | 'payable' | 'receivable' | 'settings';
 
 interface ConfirmationState {
   isOpen: boolean;
@@ -71,6 +73,9 @@ const App: React.FC = () => {
 
   const [userRules, setUserRules] = useState<AIRule[]>([]);
 
+  // Estado global de notificações
+  const [notification, setNotification] = useState<{ message: string, type: ToastType } | null>(null);
+
   const [confirmModal, setConfirmModal] = useState<ConfirmationState>({
     isOpen: false,
     title: '',
@@ -78,22 +83,23 @@ const App: React.FC = () => {
     onConfirm: () => {}
   });
 
-  // Função centralizada para atualizar configurações (Estado + DB + LocalStorage)
+  const showNotification = (message: string, type: ToastType = 'success') => {
+      setNotification({ message, type });
+  };
+
   const handleUpdateSettings = async (newSettings: SystemSettings) => {
-      // 1. Atualiza UI imediatamente
       setSystemSettings(newSettings);
       
-      // 2. Sincroniza chaves no LocalStorage para o GeminiService funcionar
       if (newSettings.apiKeys?.gemini) localStorage.setItem('finai_api_key_gemini', newSettings.apiKeys.gemini);
       if (newSettings.apiKeys?.openai) localStorage.setItem('finai_api_key_openai', newSettings.apiKeys.openai);
 
-      // 3. Persiste no Banco de Dados
       if (orgId) {
           try {
               await settingsService.updateSettings(orgId, newSettings);
+              showNotification('Configurações salvas com sucesso!');
           } catch (error) {
               console.error("Falha ao salvar configurações na nuvem:", error);
-              // Não bloqueamos a UI, apenas logamos o erro (poderia ter um toast aqui)
+              showNotification('Erro ao salvar na nuvem.', 'error');
           }
       }
   };
@@ -105,19 +111,17 @@ const App: React.FC = () => {
         financialService.getBankAccounts(id),
         financialService.getCategories(id),
         financialService.getCreditCards(id),
-        settingsService.getSettings(id) // Carrega configurações do DB
+        settingsService.getSettings(id) 
       ]);
       setTransactions(t);
       setAccounts(a);
       setCategories(c);
       setCards(crd);
       
-      // Aplica configurações carregadas
       if (settings) {
           const mergedSettings = { ...systemSettings, ...settings };
           setSystemSettings(mergedSettings as SystemSettings);
           
-          // Restaura chaves do banco para o LocalStorage (Auto-login nas APIs)
           if (mergedSettings.apiKeys?.gemini) localStorage.setItem('finai_api_key_gemini', mergedSettings.apiKeys.gemini);
           if (mergedSettings.apiKeys?.openai) localStorage.setItem('finai_api_key_openai', mergedSettings.apiKeys.openai);
       }
@@ -135,6 +139,7 @@ const App: React.FC = () => {
   const handleUpdateRules = (rules: AIRule[]) => {
       setUserRules(rules);
       offlineService.save('ai_rules', rules);
+      showNotification('Regras de IA atualizadas.');
   };
 
   const initialize = useCallback(async () => {
@@ -201,6 +206,7 @@ const App: React.FC = () => {
     try {
       await financialService.createCreditCard(card, orgId);
       await loadData(orgId);
+      showNotification('Cartão criado com sucesso!');
     } catch (e: any) { alert("Erro ao criar cartão: " + e.message); }
   };
 
@@ -209,6 +215,7 @@ const App: React.FC = () => {
     try {
       await financialService.updateCreditCard(card, orgId);
       await loadData(orgId);
+      showNotification('Cartão atualizado!');
     } catch (e: any) { alert("Erro ao atualizar cartão: " + e.message); }
   };
 
@@ -222,6 +229,7 @@ const App: React.FC = () => {
         try {
           await financialService.deleteCreditCard(id);
           await loadData(orgId);
+          showNotification('Cartão removido.', 'info');
         } catch (e: any) { alert("Erro ao excluir cartão: " + e.message); }
       },
       'danger',
@@ -234,6 +242,7 @@ const App: React.FC = () => {
     try {
       await financialService.createBankAccount(acc, orgId);
       await loadData(orgId);
+      showNotification('Conta bancária criada!');
     } catch (e: any) { alert("Erro ao criar conta: " + e.message); }
   };
 
@@ -242,6 +251,7 @@ const App: React.FC = () => {
     try {
       await financialService.updateBankAccount(acc, orgId);
       await loadData(orgId);
+      showNotification('Conta atualizada.');
     } catch (e: any) { alert("Erro ao atualizar conta: " + e.message); }
   };
 
@@ -255,6 +265,7 @@ const App: React.FC = () => {
         try {
           await financialService.deleteBankAccount(id);
           await loadData(orgId);
+          showNotification('Conta excluída.', 'info');
         } catch (e: any) { alert("Erro ao excluir conta: " + e.message); }
       },
       'danger',
@@ -267,12 +278,16 @@ const App: React.FC = () => {
     try {
       if (transactionToEdit) {
          await financialService.updateTransaction(t, orgId);
+         showNotification('Lançamento atualizado!');
       } else {
          await financialService.createTransaction(t, orgId);
+         showNotification('Lançamento salvo com sucesso!');
       }
       await loadData(orgId);
       setTransactionToEdit(null);
-    } catch (e: any) { alert("Erro ao salvar: " + e.message); }
+    } catch (e: any) { 
+        showNotification("Erro ao salvar: " + e.message, 'error'); 
+    }
   };
 
   const handleDeleteTransaction = async (id: string) => {
@@ -297,6 +312,7 @@ const App: React.FC = () => {
                           try {
                               await financialService.deleteTransaction(id);
                               await loadData(orgId);
+                              showNotification('Parcela excluída.');
                           } catch (e: any) { alert("Erro: " + e.message); }
                       }
                   },
@@ -308,6 +324,7 @@ const App: React.FC = () => {
                           try {
                               await financialService.deleteInstallmentSeries(transaction.installmentId!);
                               await loadData(orgId);
+                              showNotification('Série parcelada excluída.');
                           } catch (e: any) { alert("Erro: " + e.message); }
                       }
                   }
@@ -323,6 +340,7 @@ const App: React.FC = () => {
               try {
                   await financialService.deleteTransaction(id);
                   await loadData(orgId);
+                  showNotification('Lançamento removido.', 'info');
               } catch (e: any) { alert("Erro ao excluir lançamento: " + e.message); }
           },
           'danger',
@@ -332,6 +350,10 @@ const App: React.FC = () => {
 
   const handleUpdateTransactionLocal = async (t: Transaction) => {
     setTransactions(prev => prev.map(item => item.id === t.id ? t : item));
+    try {
+        await financialService.updateTransaction(t, orgId!);
+        showNotification('Status atualizado!');
+    } catch(e) { console.error(e); }
   };
   
   const handleEditTransaction = (t: Transaction) => {
@@ -349,6 +371,7 @@ const App: React.FC = () => {
     try {
       await financialService.createCategory(cat, orgId);
       await loadData(orgId);
+      showNotification('Categoria criada!');
     } catch (e: any) { alert("Erro ao criar categoria: " + e.message); }
   };
 
@@ -359,6 +382,7 @@ const App: React.FC = () => {
         "As transações vinculadas a esta categoria não serão excluídas, mas ficarão sem categoria definida.",
         async () => {
              setCategories(prev => prev.filter(c => c.id !== id));
+             showNotification('Categoria removida.');
         },
         'warning',
         'Excluir'
@@ -379,6 +403,7 @@ const App: React.FC = () => {
 
       try {
           await financialService.updateTransaction(updatedTransaction, orgId);
+          showNotification(updatedTransaction.isPaid ? 'Marcado como Pago' : 'Marcado como Pendente');
       } catch (e: any) {
           setTransactions(prev => prev.map(t => t.id === id ? transaction : t));
           alert("Erro ao atualizar status: " + e.message);
@@ -407,7 +432,14 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] overflow-hidden">
+    <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] overflow-hidden relative">
+      <NotificationToast 
+        isVisible={!!notification}
+        message={notification?.message || ''}
+        type={notification?.type || 'success'}
+        onClose={() => setNotification(null)}
+      />
+
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#151a21] border-r border-gray-100 dark:border-gray-800 p-6 flex flex-col transition-transform lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-10 flex items-center gap-3">
           {systemSettings.logoUrl ? (
@@ -427,9 +459,12 @@ const App: React.FC = () => {
           <NavItem icon={Briefcase} label="Cockpit Executivo" view="executive" />
           <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />
           <NavItem icon={List} label="Movimentações" view="transactions" />
+          <NavItem icon={ArrowRightLeft} label="Transferências" view="transfers" /> {/* Nova Aba */}
+          
           <div className="pt-4 pb-2 text-xs font-bold text-gray-400 uppercase tracking-widest pl-4">Operacional</div>
           <NavItem icon={TrendingDown} label="Contas a Pagar" view="payable" />
           <NavItem icon={TrendingUp} label="Contas a Receber" view="receivable" />
+          
           <div className="pt-4 pb-2 text-xs font-bold text-gray-400 uppercase tracking-widest pl-4">Cadastros</div>
           <NavItem icon={Landmark} label="Contas Bancárias" view="accounts" />
           <NavItem icon={CreditCard} label="Cartões de Crédito" view="cards" />
@@ -470,6 +505,7 @@ const App: React.FC = () => {
           {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor={systemSettings.themeColor} />}
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor={systemSettings.themeColor} categories={categories} />}
           {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransactionLocal} onToggleStatus={handleToggleStatus} onEditTransaction={handleEditTransaction} onDeleteTransaction={handleDeleteTransaction} />}
+          {currentView === 'transfers' && <TransferList transactions={transactions} accounts={accounts} onDeleteTransaction={handleDeleteTransaction} onEditTransaction={handleEditTransaction} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
@@ -490,7 +526,7 @@ const App: React.FC = () => {
           {currentView === 'settings' && (
               <Settings 
                 settings={systemSettings} 
-                onUpdateSettings={handleUpdateSettings} // Usa o novo handler centralizado
+                onUpdateSettings={handleUpdateSettings} 
                 userProfile={userProfile}
                 onUpdateProfile={setUserProfile}
                 userRules={userRules}
