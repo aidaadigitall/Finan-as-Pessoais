@@ -12,9 +12,8 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Added ErrorBoundaryProps and ErrorBoundaryState to Component generic definition
+// Fixed: Component should be defined with generic types to ensure 'props' and 'state' are correctly typed
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Use public/private modifiers or standard class syntax to ensure state is recognized
   public state: ErrorBoundaryState = {
     hasError: false,
     error: null
@@ -84,7 +83,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
     
-    // Fixed: Accessed children from this.props which is inherited from React.Component<ErrorBoundaryProps, ErrorBoundaryState>
+    // Fixed: Property 'props' is inherited from React.Component
     return this.props.children;
   }
 }

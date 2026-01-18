@@ -2,20 +2,14 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const getEnvVar = (key: string): string => {
-  // Busca em múltiplas fontes para garantir compatibilidade com VPS e builds estáticos
-  const value = (
-    (import.meta.env?.[key]) || 
-    (process.env?.[key]) || 
+  // Tenta buscar de todas as formas possíveis de injeção do Vite/SaaS
+  // Adiciona verificação de existência para import.meta e import.meta.env
+  return (
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) || 
+    (typeof process !== 'undefined' && process.env && process.env[key]) || 
     ((window as any)?.[key]) || 
     ''
   );
-  
-  // Ignora placeholders comuns ou strings vazias
-  if (!value || value.includes('YOUR_') || value.startsWith('sb_publishable_Wiz')) {
-      // Nota: Mantivemos o seu placeholder no vite.config.ts, mas aqui validamos se ele é funcional
-      return value;
-  }
-  return value;
 };
 
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
@@ -24,11 +18,15 @@ const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 // Singleton para o cliente
 let supabaseInstance: SupabaseClient | null = null;
 
-console.log("Supabase Init Diagnostic:", { 
-  hasUrl: !!supabaseUrl, 
-  hasKey: !!supabaseAnonKey,
-  urlValid: supabaseUrl?.startsWith('http') 
-});
+// Verificação segura do modo de desenvolvimento
+const isDev = typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env as any).DEV;
+
+if (isDev) {
+  console.log("Supabase Init Check:", { 
+    urlFound: !!supabaseUrl, 
+    keyFound: !!supabaseAnonKey 
+  });
+}
 
 if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
   try {
@@ -40,7 +38,7 @@ if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
       }
     });
   } catch (e) {
-    console.error("Critical: Failed to create Supabase client", e);
+    console.error("Erro ao inicializar Supabase:", e);
   }
 }
 
@@ -52,13 +50,13 @@ export const isSupabaseConfigured = (): boolean => {
 
 export const getSupabase = (): SupabaseClient => {
   if (!supabaseInstance) {
-    throw new Error("Supabase não configurado corretamente. Verifique as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.");
+    throw new Error("Supabase não configurado. Verifique as variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.");
   }
   return supabaseInstance;
 };
 
 export const getURL = () => {
-  let url = getEnvVar('VITE_SITE_URL') || window.location.origin;
+  let url = getEnvVar('VITE_SITE_URL') || (typeof window !== 'undefined' ? window.location.origin : '');
   url = url.includes('http') ? url : `https://${url}`;
   return url;
 };
