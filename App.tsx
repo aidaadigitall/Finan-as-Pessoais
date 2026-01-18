@@ -127,6 +127,25 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Erro ao criar conta: " + e.message); }
   };
 
+  // Implementação correta de atualização de conta
+  const handleUpdateAccount = async (acc: BankAccount) => {
+    if (!orgId) return;
+    try {
+      await financialService.updateBankAccount(acc, orgId);
+      await loadData(orgId);
+    } catch (e: any) { alert("Erro ao atualizar conta: " + e.message); }
+  };
+
+  // Implementação correta de exclusão de conta
+  const handleDeleteAccount = async (id: string) => {
+    if (!orgId) return;
+    if (!confirm("Tem certeza que deseja excluir esta conta? Todas as transações vinculadas perderão a referência.")) return;
+    try {
+      await financialService.deleteBankAccount(id);
+      await loadData(orgId);
+    } catch (e: any) { alert("Erro ao excluir conta: " + e.message); }
+  };
+
   const handleSaveTransaction = async (t: Transaction) => {
     if (!orgId) return;
     try {
@@ -226,7 +245,7 @@ const App: React.FC = () => {
           {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransactionLocal} onToggleStatus={handleToggleStatus} onEditTransaction={handleEditTransaction} />}
           {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
-          {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={()=>{}} onDeleteAccount={()=>{}} />}
+          {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
           {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransactionLocal} onUpdateCard={handleUpdateCard} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={()=>{}} />}
           {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor="indigo" transactions={transactions} />}

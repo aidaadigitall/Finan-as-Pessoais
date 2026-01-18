@@ -203,6 +203,30 @@ export const financialService = {
     if (error) throw error;
   },
 
+  async updateBankAccount(acc: BankAccount, orgId: string): Promise<void> {
+    const { error } = await supabase
+      .from('bank_accounts')
+      .update({
+        name: acc.name,
+        bank_name: acc.bankName,
+        initial_balance: acc.initialBalance,
+        color: acc.color
+      })
+      .eq('id', acc.id)
+      .eq('organization_id', orgId);
+
+    if (error) throw error;
+  },
+
+  async deleteBankAccount(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('bank_accounts')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+
   async createCategory(cat: Partial<Category>, orgId: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     
