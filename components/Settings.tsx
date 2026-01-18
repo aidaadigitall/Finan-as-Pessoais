@@ -38,12 +38,16 @@ export const Settings: React.FC<SettingsProps> = ({
   // Carregar API Keys do LocalStorage ao montar
   useEffect(() => {
       const savedGeminiKey = localStorage.getItem('finai_api_key_gemini');
-      if (savedGeminiKey) {
-          setLocalSettings(prev => ({
-              ...prev,
-              apiKeys: { ...prev.apiKeys, gemini: savedGeminiKey }
-          }));
-      }
+      const savedOpenAIKey = localStorage.getItem('finai_api_key_openai');
+      
+      setLocalSettings(prev => ({
+          ...prev,
+          apiKeys: { 
+              ...prev.apiKeys, 
+              gemini: savedGeminiKey || prev.apiKeys.gemini,
+              openai: savedOpenAIKey || prev.apiKeys.openai
+          }
+      }));
   }, []);
 
   const showNotification = (message: string, type: ToastType = 'success') => {
@@ -53,9 +57,12 @@ export const Settings: React.FC<SettingsProps> = ({
   const handleSaveSystem = () => {
       onUpdateSettings(localSettings);
       
-      // Salvar API Key especificamente no LocalStorage para o Service usar
+      // Salvar API Keys especificamente no LocalStorage para o Service usar
       if (localSettings.apiKeys.gemini) {
           localStorage.setItem('finai_api_key_gemini', localSettings.apiKeys.gemini);
+      }
+      if (localSettings.apiKeys.openai) {
+          localStorage.setItem('finai_api_key_openai', localSettings.apiKeys.openai);
       }
 
       showNotification('Configurações salvas e chaves de API atualizadas!');
@@ -274,13 +281,13 @@ export const Settings: React.FC<SettingsProps> = ({
              <div className="space-y-6 animate-in fade-in">
                 <div>
                   <h3 className="text-xl font-bold dark:text-white">Chaves de API</h3>
-                  <p className="text-gray-500 text-sm">Insira sua chave do Google Gemini para ativar o Chat Inteligente.</p>
+                  <p className="text-gray-500 text-sm">Configure sua inteligência artificial preferida.</p>
                </div>
 
                <div className="space-y-4">
                    {[
-                       { key: 'gemini', label: 'Google Gemini (Obrigatório)', icon: Globe, help: 'Obtenha em aistudio.google.com' },
-                       { key: 'openai', label: 'OpenAI (GPT-4)', icon: Brain, help: 'Opcional' },
+                       { key: 'gemini', label: 'Google Gemini', icon: Globe, help: 'Recomendado (Suporte a Áudio Nativo)' },
+                       { key: 'openai', label: 'OpenAI (GPT-4)', icon: Brain, help: 'Suporte a Texto e Imagens' },
                    ].map((provider) => (
                        <div key={provider.key} className="space-y-1">
                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center justify-between">
