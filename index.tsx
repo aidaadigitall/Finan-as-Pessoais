@@ -32,7 +32,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   render() {
-    // Correctly accessing this.state which is now defined via Component generics
+    // Accessing this.state defined via Component generics
     const { hasError, error } = this.state;
 
     if (hasError) {
@@ -86,7 +86,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       );
     }
     
-    // Correctly accessing this.props which is now defined via Component generics
+    // Accessing this.props defined via Component generics
     return this.props.children;
   }
 }

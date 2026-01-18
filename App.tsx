@@ -37,7 +37,7 @@ import {
 import { Transaction, BankAccount, Category, CreditCard as CreditCardType, ThemeColor, AIRule } from './types';
 
 type AppState = 'BOOTING' | 'READY' | 'OFFLINE_ERROR';
-type View = 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'whatsapp' | 'settings';
+type View = 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'settings';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('BOOTING');
@@ -57,7 +57,7 @@ const App: React.FC = () => {
     { id: '1', name: 'Alimentação', type: 'expense' },
     { id: '2', name: 'Moradia', type: 'expense' },
     { id: '3', name: 'Salário', type: 'income' },
-    { id: '4', name: 'Transporte', type: 'expense' }
+    { id: '4', name: 'Lazer', type: 'expense' }
   ]));
   const [cards, setCards] = useState<CreditCardType[]>(() => offlineService.get('cards', []));
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -69,10 +69,7 @@ const App: React.FC = () => {
     offlineService.save('cards', cards);
     offlineService.save('last_view', currentView);
     offlineService.save('theme_color', themeColor);
-    offlineService.save('user_name', userName);
-    offlineService.save('user_phone', userPhone);
-    offlineService.save('ai_rules', aiRules);
-  }, [transactions, accounts, categories, cards, currentView, themeColor, userName, userPhone, aiRules]);
+  }, [transactions, accounts, categories, cards, currentView, themeColor]);
 
   const fetchData = useCallback(async (id: string) => {
     try {
@@ -83,7 +80,7 @@ const App: React.FC = () => {
       if (t.length > 0) setTransactions(t);
       if (a.length > 0) setAccounts(a);
     } catch (e) {
-      console.warn('[Ledger] Usando cache local:', e);
+      console.warn('[Ledger] Usando cache local');
     }
   }, []);
 
@@ -118,6 +115,11 @@ const App: React.FC = () => {
     setTransactions(newList);
   };
 
+  const handleUpdateTransaction = (t: Transaction) => {
+    const newList = transactions.map(item => item.id === t.id ? t : item);
+    setTransactions(newList);
+  }
+
   const handleToggleStatus = async (id: string) => {
     const updated = transactions.map(t => t.id === id ? { ...t, isPaid: !t.isPaid } : t);
     setTransactions(updated);
@@ -135,7 +137,6 @@ const App: React.FC = () => {
     if (isConfigured) await authService.signOut();
     setSession(null);
     setOrgId(null);
-    if (!isDemoMode) setAppState('BOOTING');
     window.location.reload();
   };
 
@@ -150,7 +151,7 @@ const App: React.FC = () => {
       }}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 ${
         currentView === view 
-          ? `bg-${themeColor}-600 text-white shadow-lg shadow-${themeColor}-600/20 translate-x-1` 
+          ? `bg-${themeColor}-600 text-white shadow-lg` 
           : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
       }`}
     >
@@ -160,19 +161,19 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden font-sans">
+    <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] overflow-hidden font-sans">
       <ConnectionGuard isOnline={appState === 'READY'} isDemoMode={isDemoMode} onRetry={() => { setIsDemoMode(false); initialize(); }} onContinueOffline={() => setIsDemoMode(true)} />
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#1c2128] border-r border-gray-200 dark:border-gray-800 p-6 flex flex-col transition-transform duration-300 transform lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="mb-10 flex items-center justify-between gap-3 px-2">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#1c2128] border-r border-gray-100 dark:border-gray-800 p-6 flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="mb-10 flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
             <div className={`p-2 bg-${themeColor}-600 rounded-xl text-white shadow-lg`}><PieChart size={24}/></div>
-            <div className="flex flex-col text-left">
-              <span className="font-black text-xl tracking-tight dark:text-white leading-none">FinAI</span>
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Ledger Console</span>
+            <div>
+              <span className="font-black text-xl tracking-tight dark:text-white leading-none block">FinAI</span>
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 block">Ledger Console</span>
             </div>
           </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-500"><X size={20} /></button>
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400"><X size={20} /></button>
         </div>
         <nav className="flex-1 space-y-1">
           <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />
@@ -182,102 +183,56 @@ const App: React.FC = () => {
           <NavItem icon={Tag} label="Categorias" view="categories" />
           <div className="my-4 border-t border-gray-100 dark:border-gray-800 mx-2"></div>
           <NavItem icon={MessageSquare} label="Auditore AI" view="chat" />
-          <NavItem icon={SettingsIcon} label="Configurações" view="settings" />
         </nav>
-        <button onClick={handleLogout} className="mt-auto flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all">
+        <button onClick={handleLogout} className="mt-auto flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-all">
           <LogOut size={20} /> Sair
         </button>
       </aside>
 
       <main className="flex-1 overflow-y-auto relative bg-[#f8fafc] dark:bg-[#0b0e14]">
-        <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#1c2128]/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#1c2128]/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500">
               <Menu size={24} />
             </button>
-            <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">
-              {currentView === 'transactions' ? 'Lançamentos' : currentView}
-            </h2>
+            <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">{currentView}</h2>
           </div>
-          <button onClick={() => setIsModalOpen(true)} className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl font-black shadow-lg shadow-${themeColor}-600/20 flex items-center gap-2 transition-all active:scale-95`}>
+          <button onClick={() => setIsModalOpen(true)} className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-xl font-black shadow-lg flex items-center gap-2 transition-all active:scale-95`}>
             <Plus size={20}/> Novo Lançamento
           </button>
         </header>
 
-        <div className="p-6 lg:p-8 w-full">
+        <div className="p-6 lg:p-8">
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor={themeColor} categories={categories} />}
           {currentView === 'transactions' && (
             <TransactionList transactions={transactions} categories={categories} accounts={accountsWithComputedBalances} 
-              onUpdateTransaction={async (t) => {
-                const newList = transactions.map(item => item.id === t.id ? t : item);
-                setTransactions(newList);
-                offlineService.save('transactions', newList);
-              }} 
+              onUpdateTransaction={handleUpdateTransaction} 
               onToggleStatus={handleToggleStatus} />
           )}
           {currentView === 'accounts' && (
             <BankAccountManager accounts={accountsWithComputedBalances} transactions={transactions} 
-              onAddAccount={async (a) => {
-                setAccounts(prev => [...prev, a]);
-                if(orgId) await bankAccountsService.create(a, orgId);
-              }} 
+              onAddAccount={(a) => setAccounts(prev => [...prev, a])} 
               onUpdateAccount={(a) => setAccounts(prev => prev.map(item => item.id === a.id ? a : item))} 
-              onDeleteAccount={async (id) => {
-                setAccounts(prev => prev.filter(a => a.id !== id));
-                if(orgId) await bankAccountsService.delete(id);
-              }} />
+              onDeleteAccount={(id) => setAccounts(prev => prev.filter(a => a.id !== id))} />
           )}
           {currentView === 'cards' && (
             <CreditCardManager 
               cards={cards} 
               transactions={transactions} 
+              accounts={accountsWithComputedBalances}
               onAddCard={(c) => setCards(prev => [...prev, c])} 
               onDeleteCard={(id) => setCards(prev => prev.filter(c => c.id !== id))} 
-              themeColor={themeColor}
-            />
-          )}
-          {currentView === 'categories' && (
-            <CategoryManager 
-              categories={categories} 
-              onAddCategory={(c) => setCategories(prev => [...prev, c])}
-              onUpdateCategory={(c) => setCategories(prev => prev.map(item => item.id === c.id ? c : item))}
-              onDeleteCategory={(id) => setCategories(prev => prev.filter(c => c.id !== id))}
-            />
-          )}
-          {currentView === 'chat' && (
-            <ChatInterface 
               onAddTransaction={handleAddTransaction}
-              categories={categories}
-              userRules={aiRules}
-              onAddRule={(r) => setAiRules(prev => [...prev, r])}
+              onUpdateTransaction={handleUpdateTransaction}
               themeColor={themeColor}
-              transactions={transactions}
             />
           )}
-          {currentView === 'settings' && (
-            <Settings 
-              themeColor={themeColor}
-              setThemeColor={setThemeColor}
-              userName={userName}
-              setUserName={setUserName}
-              userPhone={userPhone}
-              setUserPhone={setUserPhone}
-              aiRules={aiRules}
-              onAddAiRule={(r) => setAiRules(prev => [...prev, r])}
-              onDeleteAiRule={(idx) => setAiRules(prev => prev.filter((_, i) => i !== idx))}
-              onResetData={() => {
-                if(confirm("Tem certeza? Isso apagará todos os dados locais.")) {
-                  offlineService.clearAll();
-                  window.location.reload();
-                }
-              }}
-            />
-          )}
+          {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={(c) => setCategories(prev => [...prev, c])} onUpdateCategory={(c) => setCategories(prev => prev.map(item => item.id === c.id ? c : item))} onDeleteCategory={(id) => setCategories(prev => prev.filter(c => c.id !== id))} />}
+          {currentView === 'chat' && <ChatInterface onAddTransaction={handleAddTransaction} categories={categories} userRules={aiRules} onAddRule={(r) => setAiRules(prev => [...prev, r])} themeColor={themeColor} transactions={transactions} />}
         </div>
       </main>
 
-      <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleAddTransaction} 
-        categories={categories} accounts={accountsWithComputedBalances} transactions={transactions} />
+      <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleAddTransaction} categories={categories} accounts={accountsWithComputedBalances} cards={cards} />
     </div>
   );
 };
@@ -285,10 +240,7 @@ const App: React.FC = () => {
 const LoadingScreen = () => (
   <div className="h-screen flex flex-col items-center justify-center bg-[#0b141a] text-white gap-6">
     <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-    <div className="text-center">
-      <h2 className="text-xl font-bold text-indigo-400">Ledger Engine</h2>
-      <p className="text-sm text-gray-500">Reconstruindo consistência financeira...</p>
-    </div>
+    <div className="text-center"><h2 className="text-xl font-bold text-indigo-400 tracking-tight">Ledger Engine</h2><p className="text-sm text-gray-500">Iniciando ambiente seguro...</p></div>
   </div>
 );
 

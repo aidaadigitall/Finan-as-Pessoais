@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Transaction, TransactionType, TransactionStatus, Category, BankAccount } from '../types';
-import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, DollarSign, Tag, Landmark, Save } from 'lucide-react';
+import { Transaction, TransactionType, TransactionStatus, Category, BankAccount, CreditCard } from '../types';
+import { X, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, DollarSign, Tag, Landmark, Save, CreditCard as CardIcon } from 'lucide-react';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -9,11 +9,11 @@ interface TransactionModalProps {
   onSave: (transaction: Transaction) => void;
   categories: Category[];
   accounts: BankAccount[];
-  transactions: Transaction[]; 
+  cards: CreditCard[];
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({ 
-  isOpen, onClose, onSave, categories, accounts 
+  isOpen, onClose, onSave, categories, accounts, cards 
 }) => {
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [description, setDescription] = useState('');
@@ -21,8 +21,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [categoryId, setCategoryId] = useState('');
   const [accountId, setAccountId] = useState('');
+  const [creditCardId, setCreditCardId] = useState('');
   const [destinationAccountId, setDestinationAccountId] = useState('');
   const [isPaid, setIsPaid] = useState(true);
+  const [originType, setOriginType] = useState<'account' | 'card'>('account');
 
   useEffect(() => {
     if (isOpen) {
@@ -32,14 +34,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setDate(new Date().toISOString().split('T')[0]);
       setCategoryId('');
       setAccountId(accounts[0]?.id || '');
-      setDestinationAccountId('');
+      setCreditCardId('');
+      setOriginType('account');
       setIsPaid(true);
     }
   }, [isOpen, accounts]);
 
   const handleSave = () => {
-      if (!description || !amount || !accountId) return;
-      if (type !== TransactionType.TRANSFER && !categoryId) return;
+      if (!description || !amount) return;
+      if (originType === 'account' && !accountId) return;
+      if (originType === 'card' && !creditCardId) return;
 
       const newTransaction: Transaction = {
           id: 'temp-' + Date.now(),
@@ -49,9 +53,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           type,
           category: type === TransactionType.TRANSFER ? 'Transferência' : categoryId,
           status: TransactionStatus.CONFIRMED,
-          isPaid,
+          isPaid: originType === 'card' ? true : isPaid, // No cartão é sempre efetivado no limite
           source: 'manual',
-          accountId,
+          accountId: originType === 'account' ? accountId : undefined,
+          creditCardId: originType === 'card' ? creditCardId : undefined,
           destinationAccountId: type === TransactionType.TRANSFER ? destinationAccountId : undefined,
           reconciled: false
       };
@@ -73,7 +78,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             <div className="p-8 overflow-y-auto space-y-6">
                 <div className="flex gap-2">
                     {[TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER].map(t => (
-                        <button key={t} onClick={() => setType(t)} className={`flex-1 py-3 rounded-2xl text-xs font-bold border transition-all ${type === t ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' : 'bg-gray-50 dark:bg-gray-900 border-transparent text-gray-500'}`}>
+                        <button key={t} onClick={() => { setType(t); if(t !== TransactionType.EXPENSE) setOriginType('account'); }} className={`flex-1 py-3 rounded-2xl text-xs font-bold border transition-all ${type === t ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-gray-50 dark:bg-gray-900 border-transparent text-gray-500'}`}>
                             {t === 'income' ? 'Receita' : t === 'expense' ? 'Despesa' : 'Transf.'}
                         </button>
                     ))}
@@ -89,11 +94,30 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
                     <div className="grid grid-cols-2 gap-4">
                         <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none" />
-                        <select value={accountId} onChange={e => setAccountId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
-                            <option value="">Selecione a Conta</option>
-                            {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                        <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
+                            <option value="">Categoria</option>
+                            {categories.filter(c => c.type === type || c.type === 'both').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>
                     </div>
+
+                    {type === TransactionType.EXPENSE && (
+                       <div className="flex gap-2 bg-gray-50 dark:bg-gray-900 p-1 rounded-2xl">
+                          <button onClick={() => setOriginType('account')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition ${originType === 'account' ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600' : 'text-gray-400'}`}><Landmark size={14}/> Conta</button>
+                          <button onClick={() => setOriginType('card')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition ${originType === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600' : 'text-gray-400'}`}><CardIcon size={14}/> Cartão</button>
+                       </div>
+                    )}
+
+                    {originType === 'account' ? (
+                       <select value={accountId} onChange={e => setAccountId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
+                           <option value="">Selecione a Conta</option>
+                           {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                       </select>
+                    ) : (
+                       <select value={creditCardId} onChange={e => setCreditCardId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
+                           <option value="">Selecione o Cartão</option>
+                           {cards.map(card => <option key={card.id} value={card.id}>{card.name}</option>)}
+                       </select>
+                    )}
 
                     {type === TransactionType.TRANSFER && (
                         <select value={destinationAccountId} onChange={e => setDestinationAccountId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
@@ -102,23 +126,18 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                         </select>
                     )}
 
-                    {type !== TransactionType.TRANSFER && (
-                        <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 dark:text-white outline-none font-bold">
-                            <option value="">Categoria</option>
-                            {categories.filter(c => c.type === type || c.type === 'both').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                        </select>
+                    {originType === 'account' && (
+                       <label className="flex items-center gap-3 cursor-pointer">
+                           <input type="checkbox" checked={isPaid} onChange={() => setIsPaid(!isPaid)} className="w-5 h-5 rounded-lg border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                           <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Efetivado (Pago/Recebido)</span>
+                       </label>
                     )}
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={isPaid} onChange={() => setIsPaid(!isPaid)} className="w-5 h-5 rounded-lg border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Lançamento Efetivado (Pago/Recebido)</span>
-                    </label>
                 </div>
             </div>
 
             <div className="p-8 bg-gray-50 dark:bg-gray-900/50 flex gap-4">
                 <button onClick={onClose} className="flex-1 py-4 text-gray-500 font-bold">Descartar</button>
-                <button onClick={handleSave} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none">Salvar Lançamento</button>
+                <button onClick={handleSave} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg">Salvar Lançamento</button>
             </div>
         </div>
     </div>

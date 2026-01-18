@@ -3,13 +3,14 @@ export enum TransactionType {
   INCOME = 'income',
   EXPENSE = 'expense',
   TRANSFER = 'transfer',
-  CREDIT_CARD = 'credit_card'
+  CREDIT_CARD_PAYMENT = 'credit_card_payment'
 }
 
 export enum TransactionStatus {
   PENDING_AUDIT = 'pending_audit',
   CONFIRMED = 'confirmed',
-  REJECTED = 'rejected'
+  REJECTED = 'rejected',
+  AUDITED = 'audited'
 }
 
 export type CategoryType = 'income' | 'expense' | 'both';
@@ -46,7 +47,7 @@ export interface CreditCard {
   closingDay: number;
   dueDay: number;
   color: string;
-  accountId: string; // Conta débito para pagamento
+  accountId: string; 
 }
 
 export interface Category {
@@ -82,13 +83,6 @@ export interface AIRule {
   category: string;
 }
 
-export interface WhatsAppConfig {
-  status: 'connected' | 'disconnected' | 'connecting';
-  phoneNumber: string | null;
-  instanceId: string | null;
-}
-
-// Added missing ChatMessage interface
 export interface ChatMessage {
   id: string;
   sender: 'ai' | 'user';
@@ -97,4 +91,10 @@ export interface ChatMessage {
   timestamp: Date;
   mediaUrl?: string;
   proposedTransaction?: Partial<Transaction>;
+}
+
+export interface WhatsAppConfig {
+  status: 'connected' | 'disconnected';
+  phoneNumber?: string;
+  instanceId?: string;
 }
