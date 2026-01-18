@@ -22,7 +22,8 @@ export const ledgerService = {
 
     // Sincronização Cloud (Background)
     if (orgId) {
-      financialService.syncTransaction(transaction, orgId).catch(err => {
+      // Fixed: syncTransaction does not exist on financialService, using createTransaction
+      financialService.createTransaction(transaction, orgId).catch(err => {
         console.error("[Ledger] Erro na sincronização cloud:", err);
       });
     }

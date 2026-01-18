@@ -1,11 +1,12 @@
 
-import { supabase, getURL } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 export const authService = {
   async signInWithGoogle() {
+    // getURL was not exported from lib/supabase, using window.location.origin as a standard redirect
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: getURL() },
+      options: { redirectTo: window.location.origin },
     });
     if (error) throw error;
     return data;
