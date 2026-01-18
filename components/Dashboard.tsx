@@ -37,7 +37,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
   const parentCategoryData = useMemo(() => {
     const data: Record<string, number> = {};
     filteredTransactions
-      .filter(t => t.type === TransactionType.EXPENSE && t.isPaid) // Considera apenas pagos para o gráfico de pizza também
+      .filter(t => t.type === TransactionType.EXPENSE && t.isPaid) // Considera apenas pagos
       .forEach(t => {
         const cat = categoryMap.get(t.category);
         let parentName = t.category;

@@ -10,6 +10,7 @@ interface TransactionListProps {
   accounts?: BankAccount[]; 
   onUpdateTransaction: (transaction: Transaction) => void;
   onToggleStatus: (id: string) => void;
+  onEditTransaction: (transaction: Transaction) => void; // Nova Prop
 }
 
 type SortConfig = {
@@ -17,17 +18,11 @@ type SortConfig = {
     direction: 'asc' | 'desc';
 } | null;
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, accounts = [], onUpdateTransaction, onToggleStatus }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, accounts = [], onUpdateTransaction, onToggleStatus, onEditTransaction }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
-  
-  // Editing state
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Transaction>>({});
-  
-  // Modal details state
   const [detailsModalId, setDetailsModalId] = useState<string | null>(null);
 
   const getAccountName = (id?: string) => accounts.find(a => a.id === id)?.name || 'Conta Padrão';
@@ -43,7 +38,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           matchesDate = matchesDate && new Date(t.date) >= new Date(startDate);
       }
       if (endDate) {
-          // Set end date to end of day
           const end = new Date(endDate);
           end.setHours(23, 59, 59, 999);
           matchesDate = matchesDate && new Date(t.date) <= end;
@@ -61,7 +55,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         let aValue: any = a[sortConfig.key as keyof Transaction];
         let bValue: any = b[sortConfig.key as keyof Transaction];
 
-        // Handle specific sorting cases
         if (sortConfig.key === 'accountName') {
             aValue = getAccountName(a.accountId);
             bValue = getAccountName(b.accountId);
@@ -79,7 +72,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         return 0;
       });
     } else {
-        // Default sort by date desc
         sortableItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
     return sortableItems;
@@ -99,7 +91,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       return <ArrowDown size={12} className="text-indigo-600" />;
   };
 
-  // Export CSV/Excel/PDF Handlers
   const handleExportPDF = () => {
       exportToPDF(sortedTransactions, accounts, { 
           fileName: `lancamentos_finai_${new Date().toISOString().slice(0,10)}.pdf`,
@@ -111,7 +102,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       exportToExcel(sortedTransactions, accounts, `lancamentos_finai_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
-  // Edit Logic
   const openDetails = (id: string) => {
       setDetailsModalId(id);
   }
@@ -128,21 +118,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-      {/* Filters Header */}
       <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Lançamentos</h3>
            <div className="flex gap-2">
-                <button 
-                    onClick={handleExportPDF}
-                    className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 px-3 py-2 rounded-lg transition"
-                >
+                <button onClick={handleExportPDF} className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 px-3 py-2 rounded-lg transition">
                     <FileText size={16} /> PDF
                 </button>
-                <button 
-                    onClick={handleExportExcel}
-                    className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 px-3 py-2 rounded-lg transition"
-                >
+                <button onClick={handleExportExcel} className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 px-3 py-2 rounded-lg transition">
                     <FileSpreadsheet size={16} /> Excel
                 </button>
            </div>
@@ -161,18 +144,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           </div>
 
           <div className="flex gap-2">
-             <input 
-                   type="date" 
-                   value={startDate}
-                   onChange={(e) => setStartDate(e.target.value)}
-                   className="pl-3 pr-2 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-900 shadow-sm dark:text-white"
-             />
-             <input 
-                   type="date" 
-                   value={endDate}
-                   onChange={(e) => setEndDate(e.target.value)}
-                   className="pl-3 pr-2 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-900 shadow-sm dark:text-white"
-             />
+             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="pl-3 pr-2 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-900 shadow-sm dark:text-white" />
+             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="pl-3 pr-2 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-900 shadow-sm dark:text-white" />
           </div>
         </div>
       </div>
@@ -181,40 +154,22 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         <table className="w-full text-left text-sm text-gray-600 dark:text-gray-300">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase text-gray-500 dark:text-gray-400 select-none">
             <tr>
-              <th 
-                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => requestSort('date')}
-              >
+              <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => requestSort('date')}>
                  <div className="flex items-center gap-1">DATA {getSortIcon('date')}</div>
               </th>
-              <th 
-                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => requestSort('description')}
-              >
+              <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => requestSort('description')}>
                  <div className="flex items-center gap-1">DESCRIÇÃO {getSortIcon('description')}</div>
               </th>
-              <th 
-                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => requestSort('accountName')}
-              >
+              <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => requestSort('accountName')}>
                  <div className="flex items-center gap-1">CONTA {getSortIcon('accountName')}</div>
               </th>
-              <th 
-                 className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                 onClick={() => requestSort('category')}
-              >
+              <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => requestSort('category')}>
                   <div className="flex items-center gap-1">CATEGORIA {getSortIcon('category')}</div>
               </th>
-              <th 
-                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => requestSort('amount')}
-              >
+              <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => requestSort('amount')}>
                  <div className="flex items-center gap-1">VALOR {getSortIcon('amount')}</div>
               </th>
-              <th 
-                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => requestSort('isPaid')}
-              >
+              <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => requestSort('isPaid')}>
                  <div className="flex items-center gap-1">STATUS {getSortIcon('isPaid')}</div>
               </th>
               <th className="px-6 py-3 text-center">Conciliar</th>
@@ -222,18 +177,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             </tr>
           </thead>
           <tbody>
-            {sortedTransactions.map((t) => {
-              const isEditing = editingId === t.id;
-
-              return (
-                <React.Fragment key={t.id}>
-                <tr className={`border-b border-gray-50 dark:border-gray-700 transition-colors ${isEditing ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-                  {/* Date */}
+            {sortedTransactions.map((t) => (
+                <tr key={t.id} className="border-b border-gray-50 dark:border-gray-700 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                     {new Date(t.date).toLocaleDateString('pt-BR')}
                   </td>
-
-                  {/* Description */}
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                     <div className="flex items-center gap-2">
                         {t.type === TransactionType.INCOME && <ArrowUpCircle size={16} className="text-green-500 shrink-0" />}
@@ -242,36 +190,25 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                         {t.description}
                     </div>
                   </td>
-
-                  {/* Account */}
                   <td className="px-6 py-4 text-xs">
                       <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
                           <Landmark size={12} />
                           {getAccountName(t.accountId)}
                           {t.type === TransactionType.TRANSFER && (
-                              <>
-                                <ArrowRightLeft size={10} className="mx-1"/>
-                                {getAccountName(t.destinationAccountId)}
-                              </>
+                              <><ArrowRightLeft size={10} className="mx-1"/>{getAccountName(t.destinationAccountId)}</>
                           )}
                       </div>
                   </td>
-
-                  {/* Category */}
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
                         {t.category}
                     </span>
                   </td>
-
-                  {/* Amount */}
                   <td className="px-6 py-4 font-bold">
                      <span className={`${t.type === TransactionType.INCOME ? 'text-green-600' : t.type === TransactionType.EXPENSE ? 'text-red-600' : 'text-blue-600'}`}>
                        {t.type === TransactionType.EXPENSE ? '-' : ''} R$ {(t.amount || 0).toFixed(2)}
                      </span>
                   </td>
-
-                  {/* Status */}
                   <td className="px-6 py-4">
                      {t.isPaid ? (
                         <span className="text-green-600 text-xs font-semibold flex items-center gap-1"><CheckCircle2 size={12}/> {t.type === TransactionType.INCOME ? 'Recebido' : 'Pago'}</span>
@@ -279,8 +216,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                         <span className="text-yellow-600 text-xs font-semibold flex items-center gap-1"><Clock size={12}/> Pendente</span>
                      )}
                   </td>
-
-                  {/* Reconcile Checkbox */}
                   <td className="px-6 py-4 text-center">
                       <input 
                         type="checkbox" 
@@ -290,12 +225,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                         title="Conciliar Extrato"
                       />
                   </td>
-
-                  {/* Actions */}
                   <td className="px-6 py-4 text-center">
                      <div className="flex items-center justify-center gap-2">
                         <button onClick={() => openDetails(t.id)} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition" title="Ver Detalhes">
                             <Eye size={16} />
+                        </button>
+                        <button onClick={() => onEditTransaction(t)} className="p-2 text-gray-400 hover:text-orange-500 rounded-full hover:bg-orange-50 dark:hover:bg-orange-900/20 transition" title="Editar">
+                            <Edit2 size={16} />
                         </button>
                         <button onClick={() => onToggleStatus(t.id)} className={`p-2 rounded-full transition hover:bg-gray-100 dark:hover:bg-gray-700 ${t.isPaid ? 'text-green-600' : 'text-gray-400 hover:text-green-600'}`} title={t.isPaid ? "Marcar como pendente" : "Marcar como pago"}>
                            <CheckCircle2 size={16} />
@@ -303,19 +239,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                      </div>
                   </td>
                 </tr>
-                </React.Fragment>
-              );
-            })}
+            ))}
           </tbody>
         </table>
       </div>
 
-      {/* Details Modal */}
       {selectedTransaction && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
               <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col max-h-[90vh]">
-                  
-                  {/* Modal Header */}
                   <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
                       <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
                           <Info size={18} className="text-indigo-500"/> Detalhes do Lançamento
@@ -325,10 +256,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                       </button>
                   </div>
 
-                  {/* Modal Content */}
                   <div className="p-6 overflow-y-auto custom-scrollbar space-y-5">
-                      
-                      {/* Amount & Type Badge */}
                       <div className="flex justify-between items-center">
                           <div>
                               <p className="text-xs text-gray-500 uppercase font-bold mb-1">Valor</p>
@@ -345,113 +273,22 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                           </span>
                       </div>
 
-                      {/* Description & Category */}
                       <div className="grid grid-cols-1 gap-4">
                            <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
                                <p className="text-xs text-gray-400 uppercase font-bold mb-1">Descrição</p>
                                <p className="font-medium text-gray-800 dark:text-gray-200">{selectedTransaction.description}</p>
                            </div>
-                           <div className="grid grid-cols-2 gap-4">
-                               <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
-                                   <p className="text-xs text-gray-400 uppercase font-bold mb-1">Categoria</p>
-                                   <div className="flex items-center gap-2">
-                                       <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                                       <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">{selectedTransaction.category}</span>
-                                   </div>
-                               </div>
-                               <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700">
-                                   <p className="text-xs text-gray-400 uppercase font-bold mb-1">Data</p>
-                                   <div className="flex items-center gap-2">
-                                       <Calendar size={14} className="text-gray-400" />
-                                       <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">
-                                           {new Date(selectedTransaction.date).toLocaleDateString('pt-BR')}
-                                       </span>
-                                   </div>
-                               </div>
-                           </div>
                       </div>
-
-                      {/* Account Info */}
-                      <div>
-                           <p className="text-xs text-gray-500 uppercase font-bold mb-2">Movimentação</p>
-                           <div className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-xl">
-                               <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600">
-                                   <Landmark size={20} />
-                               </div>
-                               <div>
-                                   <p className="text-xs text-gray-400">Conta Bancária</p>
-                                   <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
-                                       {getAccountName(selectedTransaction.accountId)}
-                                   </p>
-                               </div>
-                               {selectedTransaction.type === TransactionType.TRANSFER && (
-                                   <>
-                                       <ArrowRightLeft size={16} className="text-gray-400" />
-                                       <div>
-                                           <p className="text-xs text-gray-400">Destino</p>
-                                           <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
-                                               {getAccountName(selectedTransaction.destinationAccountId)}
-                                           </p>
-                                       </div>
-                                   </>
-                               )}
-                           </div>
-                      </div>
-
-                      {/* Source & Metadata */}
-                      <div className="border-t border-gray-100 dark:border-gray-700 pt-4 space-y-3">
-                           <div className="flex justify-between items-center text-sm">
-                               <span className="text-gray-500 flex items-center gap-1"><Bot size={14}/> Fonte</span>
-                               <span className="font-medium text-gray-800 dark:text-gray-200 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                                   {selectedTransaction.source === 'whatsapp_ai' ? 'Inteligência Artificial (WhatsApp)' : 'Manual'}
-                               </span>
-                           </div>
-                           
-                           {selectedTransaction.recurrence && selectedTransaction.recurrence !== 'none' && (
-                               <div className="flex justify-between items-center text-sm">
-                                   <span className="text-gray-500 flex items-center gap-1"><Repeat size={14}/> Recorrência</span>
-                                   <span className="font-medium text-gray-800 dark:text-gray-200">
-                                       {RecurrenceLabels[selectedTransaction.recurrence]}
-                                   </span>
-                               </div>
-                           )}
-
-                           <div className="flex justify-between items-center text-sm">
-                               <span className="text-gray-500 flex items-center gap-1"><CheckCircle2 size={14}/> Status</span>
-                               <span className={`font-bold ${selectedTransaction.isPaid ? 'text-green-600' : 'text-yellow-600'}`}>
-                                   {selectedTransaction.isPaid ? 'Pago / Recebido' : 'Pendente'}
-                               </span>
-                           </div>
-
-                           {selectedTransaction.dueDate && (
-                               <div className="flex justify-between items-center text-sm">
-                                   <span className="text-gray-500 flex items-center gap-1"><Clock size={14}/> Vencimento</span>
-                                   <span className="font-medium text-gray-800 dark:text-gray-200">
-                                       {new Date(selectedTransaction.dueDate).toLocaleDateString('pt-BR')}
-                                   </span>
-                               </div>
-                           )}
-                      </div>
-
-                      {/* Original Input (AI Context) */}
-                      {selectedTransaction.originalInput && (
-                          <div className="mt-4 p-3 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
-                              <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1 flex items-center gap-1">
-                                  <Bot size={12} /> Input Original (IA)
-                              </p>
-                              <p className="text-sm italic text-gray-600 dark:text-gray-300">"{selectedTransaction.originalInput}"</p>
-                          </div>
-                      )}
-
                   </div>
                   
-                  {/* Modal Footer */}
                   <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex gap-3">
                        <button onClick={closeDetails} className="flex-1 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition font-medium">
                            Fechar
                        </button>
+                       <button onClick={() => { closeDetails(); onEditTransaction(selectedTransaction); }} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium flex items-center justify-center gap-2">
+                           <Edit2 size={16} /> Editar
+                       </button>
                   </div>
-
               </div>
           </div>
       )}

@@ -10,10 +10,11 @@ interface TransactionModalProps {
   categories: Category[];
   accounts: BankAccount[];
   cards: CreditCard[];
+  transactionToEdit?: Transaction | null; // Nova prop para edição
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({ 
-  isOpen, onClose, onSave, categories, accounts, cards 
+  isOpen, onClose, onSave, categories, accounts, cards, transactionToEdit 
 }) => {
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [description, setDescription] = useState('');
@@ -33,21 +34,43 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setType(TransactionType.EXPENSE);
-      setDescription('');
-      setAmount('');
-      setDate(new Date().toISOString().split('T')[0]);
-      setDueDate('');
-      setCategoryId('');
-      // Inicializa com a primeira conta válida se houver, ou vazio
-      setAccountId(accounts.length > 0 ? accounts[0].id : '');
-      setCreditCardId('');
-      setOriginType('account');
-      setIsPaid(true);
-      setIsInstallment(false);
-      setInstallmentCount(2);
+      if (transactionToEdit) {
+        // Modo Edição: Popula os campos
+        setType(transactionToEdit.type);
+        setDescription(transactionToEdit.description);
+        setAmount(transactionToEdit.amount.toString());
+        setDate(new Date(transactionToEdit.date).toISOString().split('T')[0]);
+        setDueDate(transactionToEdit.dueDate ? new Date(transactionToEdit.dueDate).toISOString().split('T')[0] : '');
+        
+        // Tenta encontrar ID da categoria pelo nome se categoryId estiver vazio
+        const foundCat = categories.find(c => c.id === transactionToEdit.categoryId || c.name === transactionToEdit.category);
+        setCategoryId(foundCat ? foundCat.id : '');
+        
+        setAccountId(transactionToEdit.accountId || '');
+        setCreditCardId(transactionToEdit.creditCardId || '');
+        setDestinationAccountId(transactionToEdit.destinationAccountId || '');
+        
+        setOriginType(transactionToEdit.creditCardId ? 'card' : 'account');
+        setIsPaid(transactionToEdit.isPaid);
+        setIsInstallment(!!transactionToEdit.installmentId); // Se tem ID de parcelamento, mostra como parcelado (visual apenas)
+        setInstallmentCount(transactionToEdit.installmentCount || 2);
+      } else {
+        // Modo Novo Lançamento: Reseta
+        setType(TransactionType.EXPENSE);
+        setDescription('');
+        setAmount('');
+        setDate(new Date().toISOString().split('T')[0]);
+        setDueDate('');
+        setCategoryId('');
+        setAccountId(accounts.length > 0 ? accounts[0].id : '');
+        setCreditCardId('');
+        setOriginType('account');
+        setIsPaid(true);
+        setIsInstallment(false);
+        setInstallmentCount(2);
+      }
     }
-  }, [isOpen, accounts]);
+  }, [isOpen, transactionToEdit, accounts, categories]);
 
   const organizedCategories = useMemo(() => {
     const filtered = categories.filter(c => c.type === type || c.type === 'both');
@@ -70,33 +93,32 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       const selectedCat = categories.find(c => c.id === categoryId);
       const parsedAmount = parseFloat(amount);
 
-      // Validação de Segurança: Garante que o ID selecionado realmente existe na lista atual
-      // Isso previne o erro "violates foreign key constraint" se o state tiver um ID antigo
       const validAccount = accounts.find(a => a.id === accountId);
       const validCard = cards.find(c => c.id === creditCardId);
       const validDestAccount = accounts.find(a => a.id === destinationAccountId);
 
-      // Determina os IDs finais com base no tipo de origem e validade
       const finalAccountId = originType === 'account' && validAccount ? validAccount.id : undefined;
       const finalCardId = originType === 'card' && validCard ? validCard.id : undefined;
       const finalDestId = type === TransactionType.TRANSFER && validDestAccount ? validDestAccount.id : undefined;
 
       const newTransaction: Transaction = {
-          id: 'temp-' + Date.now(),
+          id: transactionToEdit ? transactionToEdit.id : 'temp-' + Date.now(), // Mantém ID se editando
           date: new Date(date).toISOString(),
           dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
           description,
           amount: parsedAmount,
           type,
           category: type === TransactionType.TRANSFER ? 'Transferência' : (selectedCat?.name || 'Outros'),
+          categoryId: selectedCat?.id, // Importante salvar o ID da categoria
           status: TransactionStatus.CONFIRMED,
-          isPaid: originType === 'card' ? true : isPaid, // Cartão sempre entra como "pago" no sentido de usar limite
-          source: 'manual',
+          isPaid: originType === 'card' ? true : isPaid,
+          source: transactionToEdit ? transactionToEdit.source : 'manual',
           accountId: finalAccountId,
           creditCardId: finalCardId,
           destinationAccountId: finalDestId,
-          reconciled: false,
-          installmentCount: isInstallment ? installmentCount : undefined
+          reconciled: transactionToEdit ? transactionToEdit.reconciled : false,
+          installmentCount: isInstallment ? installmentCount : undefined,
+          installmentId: transactionToEdit ? transactionToEdit.installmentId : undefined // Mantém vínculo de parcela se existir
       };
 
       onSave(newTransaction);
@@ -109,7 +131,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
         <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Novo Lançamento</h2>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                  {transactionToEdit ? 'Editar Lançamento' : 'Novo Lançamento'}
+                </h2>
                 <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
 
@@ -151,8 +175,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                         {organizedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
 
-                    {/* Área de Parcelamento */}
-                    {type !== TransactionType.TRANSFER && (
+                    {/* Área de Parcelamento (Desativada em Edição para Simplificar) */}
+                    {type !== TransactionType.TRANSFER && !transactionToEdit && (
                         <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-4">
                             <label className="flex items-center justify-between cursor-pointer">
                                 <div className="flex items-center gap-2">
@@ -231,7 +255,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             <div className="p-8 bg-gray-50 dark:bg-gray-900/50 flex gap-4 border-t border-gray-100 dark:border-gray-800">
                 <button onClick={onClose} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition">Descartar</button>
                 <button onClick={handleSave} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition transform active:scale-95 flex items-center justify-center gap-2">
-                    <Save size={18} /> Salvar Lançamento
+                    <Save size={18} /> {transactionToEdit ? 'Salvar Alterações' : 'Salvar Lançamento'}
                 </button>
             </div>
         </div>

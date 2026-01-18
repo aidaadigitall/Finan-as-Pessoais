@@ -38,6 +38,9 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [cards, setCards] = useState<CreditCardType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Estado para armazenar a transação sendo editada
+  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
 
   const loadData = useCallback(async (id: string) => {
     try {
@@ -127,15 +130,32 @@ const App: React.FC = () => {
   const handleSaveTransaction = async (t: Transaction) => {
     if (!orgId) return;
     try {
-      await financialService.createTransaction(t, orgId);
+      if (transactionToEdit) {
+         // Edição
+         await financialService.updateTransaction(t, orgId);
+      } else {
+         // Novo
+         await financialService.createTransaction(t, orgId);
+      }
       await loadData(orgId);
+      setTransactionToEdit(null); // Reseta após salvar
     } catch (e: any) { alert("Erro ao salvar: " + e.message); }
   };
 
-  const handleUpdateTransaction = async (t: Transaction) => {
-    // Para updates completos, idealmente teríamos um método updateTransaction no service
-    // Por enquanto atualizamos localmente para refletir na UI
+  // Esta função apenas atualiza o estado local, ideal para toggle rápido
+  const handleUpdateTransactionLocal = async (t: Transaction) => {
     setTransactions(prev => prev.map(item => item.id === t.id ? t : item));
+  };
+  
+  // Função que abre o modal já preenchido
+  const handleEditTransaction = (t: Transaction) => {
+      setTransactionToEdit(t);
+      setIsModalOpen(true);
+  };
+  
+  const openNewTransactionModal = () => {
+      setTransactionToEdit(null);
+      setIsModalOpen(true);
   };
 
   const handleAddCategory = async (cat: Category) => {
@@ -147,7 +167,8 @@ const App: React.FC = () => {
   };
   
   const handleToggleStatus = async (id: string) => {
-      // Simulação de toggle status com persistência local rápida
+      // Toggle local para feedback instantâneo
+      // Idealmente, chamaria um serviço de updateStatus no backend aqui também
       setTransactions(prev => prev.map(t => {
           if (t.id === id) return { ...t, isPaid: !t.isPaid, status: !t.isPaid ? TransactionStatus.CONFIRMED : TransactionStatus.PENDING_AUDIT };
           return t;
@@ -194,7 +215,7 @@ const App: React.FC = () => {
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#151a21]/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
           <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 text-gray-500"><Menu size={22} /></button>
           <div className="flex-1 px-4"></div>
-          <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-xl flex items-center gap-2 transition-all active:scale-95">
+          <button onClick={openNewTransactionModal} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-xl flex items-center gap-2 transition-all active:scale-95">
             <Plus size={20}/> Novo Lançamento
           </button>
         </header>
@@ -202,16 +223,24 @@ const App: React.FC = () => {
         <div className="p-6 lg:p-10 max-w-7xl mx-auto">
           {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor="indigo" />}
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={categories} />}
-          {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransaction} onToggleStatus={handleToggleStatus} />}
-          {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransaction} onOpenTransactionModal={() => setIsModalOpen(true)} />}
-          {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransaction} onOpenTransactionModal={() => setIsModalOpen(true)} />}
+          {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransactionLocal} onToggleStatus={handleToggleStatus} onEditTransaction={handleEditTransaction} />}
+          {currentView === 'payable' && <AccountsPayable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
+          {currentView === 'receivable' && <AccountsReceivable transactions={transactions} accounts={accounts} onToggleStatus={handleToggleStatus} onUpdateTransaction={handleUpdateTransactionLocal} onOpenTransactionModal={openNewTransactionModal} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={()=>{}} onDeleteAccount={()=>{}} />}
-          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateCard={handleUpdateCard} />}
+          {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransactionLocal} onUpdateCard={handleUpdateCard} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={()=>{}} />}
           {currentView === 'chat' && <ChatInterface onAddTransaction={handleSaveTransaction} categories={categories} userRules={[]} onAddRule={()=>{}} themeColor="indigo" transactions={transactions} />}
         </div>
       </main>
-      <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveTransaction} categories={categories} accounts={accounts} cards={cards} />
+      <TransactionModal 
+         isOpen={isModalOpen} 
+         onClose={() => setIsModalOpen(false)} 
+         onSave={handleSaveTransaction} 
+         categories={categories} 
+         accounts={accounts} 
+         cards={cards}
+         transactionToEdit={transactionToEdit} // Passa a transação para edição
+      />
     </div>
   );
 };

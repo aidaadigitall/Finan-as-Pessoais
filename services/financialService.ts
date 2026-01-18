@@ -2,7 +2,6 @@
 import { supabase } from '../lib/supabase';
 import { Transaction, BankAccount, Category, TransactionType, TransactionStatus, CreditCard } from '../types';
 
-// Helper para evitar enviar strings vazias para campos UUID
 const sanitizeId = (id: string | undefined | null) => {
   if (!id || id === 'undefined' || (typeof id === 'string' && id.trim() === '')) return null;
   return id;
@@ -26,16 +25,18 @@ export const financialService = {
         amount: Number(t.amount),
         type: t.type as TransactionType,
         category: t.category,
+        categoryId: t.category_id, // Ensure categoryId is mapped if available in DB
         status: t.status as TransactionStatus,
         isPaid: t.is_paid,
         source: t.source,
         accountId: t.account_id,
         destinationAccountId: t.destination_account_id,
-        credit_card_id: t.credit_card_id,
+        creditCardId: t.credit_card_id,
         reconciled: t.reconciled,
         installmentId: t.installment_id,
         installmentNumber: t.installment_number,
-        installmentCount: t.installment_count
+        installmentCount: t.installment_count,
+        attachmentUrl: t.attachment_url
       }));
     } catch (e) {
       console.error("Erro ao carregar transações:", e);
@@ -127,7 +128,6 @@ export const financialService = {
         const currentDate = new Date(baseDate);
         currentDate.setMonth(baseDate.getMonth() + i);
         
-        // Ajuste para fim de mês (ex: 31 de jan -> 28 de fev)
         if (currentDate.getDate() !== baseDate.getDate()) {
             currentDate.setDate(0);
         }
@@ -139,6 +139,7 @@ export const financialService = {
             amount: amount,
             type: t.type,
             category: t.category,
+            // category_id: t.categoryId, // Ensure column exists in DB if used
             date: currentDate.toISOString(),
             due_date: t.dueDate ? new Date(new Date(t.dueDate).setMonth(new Date(t.dueDate).getMonth() + i)).toISOString() : currentDate.toISOString(),
             is_paid: isPaid,
@@ -150,11 +151,36 @@ export const financialService = {
             source: t.source || 'manual',
             installment_id: installmentId,
             installment_number: installmentCount > 1 ? i + 1 : null,
-            installment_count: installmentCount > 1 ? installmentCount : null
+            installment_count: installmentCount > 1 ? installmentCount : null,
+            attachment_url: t.attachmentUrl
         });
     }
 
     const { error } = await supabase.from('transactions').insert(transactionsToInsert);
+    if (error) throw error;
+  },
+
+  async updateTransaction(t: Transaction, orgId: string): Promise<void> {
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        description: t.description,
+        amount: t.amount,
+        type: t.type,
+        category: t.category,
+        // category_id: t.categoryId, 
+        date: t.date,
+        due_date: t.dueDate,
+        is_paid: t.isPaid,
+        account_id: sanitizeId(t.accountId),
+        destination_account_id: sanitizeId(t.destinationAccountId),
+        credit_card_id: sanitizeId(t.creditCardId),
+        source: t.source,
+        attachment_url: t.attachmentUrl
+      })
+      .eq('id', t.id)
+      .eq('organization_id', orgId);
+
     if (error) throw error;
   },
 
