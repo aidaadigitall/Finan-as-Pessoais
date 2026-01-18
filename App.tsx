@@ -40,12 +40,12 @@ type View = 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' |
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('BOOTING');
   const [session, setSession] = useState<any>(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(() => !isConfigured || offlineService.get('demo_mode', false));
   const [orgId, setOrgId] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<View>('dashboard');
-  const [themeColor, setThemeColor] = useState<ThemeColor>('indigo');
+  const [currentView, setCurrentView] = useState<View>(() => offlineService.get('last_view', 'dashboard'));
+  const [themeColor, setThemeColor] = useState<ThemeColor>(() => offlineService.get('theme_color', 'indigo'));
 
-  // Centralized State - Carregando do cache inicial
+  // Centralized State with immediate cache loading
   const [transactions, setTransactions] = useState<Transaction[]>(() => offlineService.get('transactions', []));
   const [accounts, setAccounts] = useState<BankAccount[]>(() => offlineService.get('accounts', []));
   const [categories, setCategories] = useState<Category[]>(() => offlineService.get('categories', [
@@ -58,23 +58,54 @@ const App: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Persistence Effects - Keep data alive between tab switches/reloads
+  useEffect(() => {
+    offlineService.save('transactions', transactions);
+    offlineService.save('accounts', accounts);
+    offlineService.save('categories', categories);
+    offlineService.save('cards', cards);
+    offlineService.save('theme_color', themeColor);
+    offlineService.save('last_view', currentView);
+    offlineService.save('demo_mode', isDemoMode);
+  }, [transactions, accounts, categories, cards, themeColor, currentView, isDemoMode]);
+
   const fetchData = useCallback(async (id: string) => {
     try {
       const [t, a] = await Promise.all([
         financialService.getTransactions(id),
         financialService.getBankAccounts(id)
       ]);
-      setTransactions(t);
-      setAccounts(a);
+      if (t.length > 0) setTransactions(t);
+      if (a.length > 0) setAccounts(a);
     } catch (e) {
       console.error('Falha ao carregar dados remotos:', e);
     }
   }, []);
 
+  const syncLocalToCloud = useCallback(async (id: string) => {
+    const localTransactions = offlineService.get<Transaction[]>('transactions', []);
+    const unsynced = localTransactions.filter(t => t.source === 'manual' || t.source === 'whatsapp_ai');
+    
+    for (const t of unsynced) {
+        try {
+          await financialService.syncTransaction(t, id);
+        } catch(err) {
+          console.warn("Falha ao sincronizar item:", t.description);
+        }
+    }
+    await fetchData(id);
+  }, [fetchData]);
+
   const initialize = useCallback(async (retry = false) => {
     setAppState('BOOTING');
-    const online = await testSupabaseConnection(4000);
     
+    if (!isConfigured) {
+        setIsDemoMode(true);
+        setAppState('READY');
+        return;
+    }
+
+    const online = await testSupabaseConnection(3000);
     if (!online && !isDemoMode && !retry) {
       setAppState('OFFLINE_ERROR');
       return;
@@ -87,14 +118,14 @@ const App: React.FC = () => {
       if (currentSession) {
         const id = await authService.ensureUserResources(currentSession.user.id, currentSession.user.email!);
         setOrgId(id);
-        await fetchData(id);
+        await syncLocalToCloud(id);
       }
       setAppState('READY');
     } catch (e) {
       setAppState('READY');
       setIsDemoMode(true);
     }
-  }, [isDemoMode, fetchData]);
+  }, [isDemoMode, syncLocalToCloud]);
 
   useEffect(() => {
     initialize();
@@ -105,45 +136,21 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [initialize]);
 
-  // Persistência local automática sempre que o estado mudar
-  useEffect(() => {
-    offlineService.save('transactions', transactions);
-  }, [transactions]);
-
-  useEffect(() => {
-    offlineService.save('accounts', accounts);
-  }, [accounts]);
-
-  useEffect(() => {
-    offlineService.save('categories', categories);
-  }, [categories]);
-
-  useEffect(() => {
-    offlineService.save('cards', cards);
-  }, [cards]);
-
   const handleAddTransaction = async (t: Transaction) => {
-    // 1. Atualizar UI imediatamente (Optimistic UI)
+    // Add locally immediately for snappy UI
     setTransactions(prev => [t, ...prev]);
-    
-    // 2. Tentar sincronizar
     try {
       if (orgId) {
         const saved = await financialService.syncTransaction(t, orgId);
-        // Atualizar o item temporário com os dados reais se necessário
         setTransactions(prev => prev.map(item => item.id === t.id ? saved : item));
-      } else {
-        // Se sem orgId, apenas garante que está no offlineService
-        financialService.syncTransaction(t, "");
       }
     } catch (e) {
-      console.error("Falha na sincronização, transação mantida localmente.");
+      console.error("Erro na sync cloud:", e);
     }
   };
 
   const handleToggleStatus = async (id: string) => {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, isPaid: !t.isPaid } : t));
-    
     if (orgId) {
       const t = transactions.find(x => x.id === id);
       if (t) {
@@ -202,7 +209,7 @@ const App: React.FC = () => {
 
         <div className="mt-auto pt-6 border-t border-gray-100 dark:border-gray-800">
            <button 
-            onClick={() => { authService.signOut(); setSession(null); setIsDemoMode(false); }} 
+            onClick={() => { authService.signOut(); setSession(null); setIsDemoMode(!isConfigured); setOrgId(null); offlineService.clearAll(); }} 
             className="w-full flex items-center gap-3 px-4 py-3 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors"
            >
             <LogOut size={20}/> Sair do SaaS
@@ -329,8 +336,8 @@ const LoadingScreen = () => (
       <div className="absolute top-0 w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
     </div>
     <div className="text-center">
-      <h2 className="text-xl font-bold tracking-tighter">FinAI Cloud</h2>
-      <p className="text-sm text-gray-500 animate-pulse">Orquestrando seu ecossistema financeiro...</p>
+      <h2 className="text-xl font-bold tracking-tighter text-indigo-400">FinAI Cloud</h2>
+      <p className="text-sm text-gray-500 animate-pulse">Protegendo seu ecossistema financeiro...</p>
     </div>
   </div>
 );
