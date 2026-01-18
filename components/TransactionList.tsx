@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Transaction, TransactionType, Category, RecurrenceFrequency, RecurrenceLabels, BankAccount } from '../types';
 import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText, Bot, User } from 'lucide-react';
@@ -48,13 +49,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   // Export CSV/Excel/PDF Handlers
   const handleExportPDF = () => {
       exportToPDF(filteredTransactions, accounts, { 
-          fileName: `extrato_finai_${new Date().toISOString().slice(0,10)}.pdf`,
-          companyName: 'Minha Empresa SaaS' 
+          fileName: `lancamentos_finai_${new Date().toISOString().slice(0,10)}.pdf`,
+          companyName: 'FinAI Ledger' 
       });
   };
 
   const handleExportExcel = () => {
-      exportToExcel(filteredTransactions, accounts, `extrato_finai_${new Date().toISOString().slice(0,10)}.xlsx`);
+      exportToExcel(filteredTransactions, accounts, `lancamentos_finai_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
   // Edit Logic
@@ -102,7 +103,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       {/* Filters Header */}
       <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-           <h3 className="text-lg font-bold text-gray-800 dark:text-white">Lançamentos Diários</h3>
+           <h3 className="text-lg font-bold text-gray-800 dark:text-white">Lançamentos</h3>
            <div className="flex gap-2">
                 <button 
                     onClick={handleExportPDF}
