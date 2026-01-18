@@ -12,7 +12,7 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fixed: Component should be defined with generic types to ensure 'props' and 'state' are correctly typed
+// Fix: explicitly define props and state types in the class generic to allow access to this.props and this.state
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = {
     hasError: false,
@@ -28,7 +28,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error("Critical UI Error:", error, errorInfo);
+    console.error("UI Critical Error:", error, errorInfo);
   }
 
   render() {
@@ -45,19 +45,21 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           flexDirection: 'column', 
           justifyContent: 'center', 
           alignItems: 'center',
-          backgroundColor: '#f9fafb'
+          backgroundColor: '#0b0e14',
+          color: 'white'
         }}>
           <h1 style={{color: '#ef4444', fontSize: '24px', fontWeight: 'bold'}}>Erro de Inicialização</h1>
-          <p style={{color: '#6b7280', marginTop: '10px'}}>Algo deu errado na renderização do App.</p>
+          <p style={{color: '#9ca3af', marginTop: '10px'}}>Não foi possível renderizar a interface.</p>
           <pre style={{
-            background: '#ffffff', 
+            background: '#1f2937', 
             padding: '20px', 
             borderRadius: '12px', 
-            border: '1px solid #e5e7eb',
+            border: '1px solid #374151',
             marginTop: '20px', 
             fontSize: '12px',
             maxWidth: '80%',
-            overflowX: 'auto'
+            overflowX: 'auto',
+            color: '#f87171'
           }}>
             {error?.message || error?.toString()}
           </pre>
@@ -68,7 +70,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             }} 
             style={{
               marginTop: '20px',
-              padding: '10px 24px', 
+              padding: '12px 24px', 
               background: '#4f46e5', 
               color: 'white', 
               border: 'none', 
@@ -77,13 +79,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               fontWeight: '600'
             }}
           >
-            Resetar App e Tentar Novamente
+            Resetar e Tentar Novamente
           </button>
         </div>
       );
     }
     
-    // Fixed: Property 'props' is inherited from React.Component and is now typed via generics
+    // Fix: Access children from props correctly
     return this.props.children || null;
   }
 }
