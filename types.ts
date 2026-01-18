@@ -66,7 +66,7 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   category: string;
-  categoryId?: string; // Recomendado para links precisos com subcategorias
+  categoryId?: string;
   status: TransactionStatus;
   isPaid: boolean;
   source: 'whatsapp_ai' | 'manual' | 'import';
@@ -76,6 +76,11 @@ export interface Transaction {
   destinationAccountId?: string;
   creditCardId?: string;
   reconciled?: boolean;
+  
+  // Campos de Parcelamento
+  installmentId?: string; // ID único que agrupa todas as parcelas
+  installmentNumber?: number; // Número da parcela atual (1, 2, 3...)
+  installmentCount?: number; // Total de parcelas (12)
 }
 
 export type ThemeColor = 'indigo' | 'blue' | 'emerald' | 'violet' | 'rose';

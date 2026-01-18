@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Transaction, TransactionType } from '../types';
-import { Calendar, CheckCircle, TrendingUp, Wallet, ArrowDown, Plus } from 'lucide-react';
+import { Calendar, CheckCircle, TrendingUp, Wallet, ArrowDown, Plus, Layers } from 'lucide-react';
 
 interface AccountsReceivableProps {
   transactions: Transaction[];
@@ -77,7 +78,14 @@ export const AccountsReceivable: React.FC<AccountsReceivableProps> = ({ transact
                         </div>
                     </td>
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                      {t.description}
+                      <div className="flex items-center gap-2">
+                        {t.description}
+                        {t.installmentNumber && (
+                           <span className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-500 flex items-center gap-1" title="Parcelado">
+                              <Layers size={10} /> {t.installmentNumber}/{t.installmentCount}
+                           </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">

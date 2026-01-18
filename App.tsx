@@ -13,15 +13,18 @@ import { CategoryManager } from './components/CategoryManager';
 import { CreditCardManager } from './components/CreditCardManager';
 import { ChatInterface } from './components/ChatInterface';
 import { Auth } from './components/Auth';
+import { AccountsPayable } from './components/AccountsPayable';
+import { AccountsReceivable } from './components/AccountsReceivable';
 
 import { 
   LayoutDashboard, List, Landmark, LogOut, Plus, 
-  CreditCard, Tag, MessageSquare, Menu, Loader2, AlertTriangle, RefreshCw, Briefcase
+  CreditCard, Tag, MessageSquare, Menu, Loader2, AlertTriangle, RefreshCw, Briefcase,
+  TrendingDown, TrendingUp
 } from 'lucide-react';
 import { Transaction, BankAccount, Category, CreditCard as CreditCardType, TransactionStatus } from './types';
 
 type AppState = 'BOOTING' | 'AUTH_REQUIRED' | 'LOADING_DATA' | 'READY' | 'CRITICAL_ERROR';
-type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat';
+type View = 'executive' | 'dashboard' | 'transactions' | 'accounts' | 'cards' | 'categories' | 'chat' | 'payable' | 'receivable';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('BOOTING');
@@ -47,7 +50,6 @@ const App: React.FC = () => {
       setAccounts(a);
       setCategories(c);
       
-      // Simulação ou carregamento real de cartões
       const mockCards: CreditCardType[] = [
         { id: 'card-1', name: 'Nubank Gold', brand: 'mastercard', limit: 5000, usedLimit: 0, closingDay: 5, dueDay: 12, color: 'indigo', accountId: a[0]?.id || '' }
       ];
@@ -96,9 +98,7 @@ const App: React.FC = () => {
   const handleUpdateCard = async (card: CreditCardType) => {
     if (!orgId) return;
     try {
-      // Simulação de update no estado local enquanto não há tabela de cartões
       setCards(prev => prev.map(c => c.id === card.id ? card : c));
-      // Se houvesse tabela real: await financialService.updateCreditCard(card, orgId);
     } catch (e: any) { alert("Erro ao atualizar cartão: " + e.message); }
   };
 
@@ -129,6 +129,15 @@ const App: React.FC = () => {
       await loadData(orgId);
     } catch (e: any) { alert("Erro ao criar categoria: " + e.message); }
   };
+  
+  const handleToggleStatus = async (id: string) => {
+      // Simulação de toggle status com persistência local rápida
+      // Em produção, isso chamaria uma service que atualiza no Supabase
+      setTransactions(prev => prev.map(t => {
+          if (t.id === id) return { ...t, isPaid: !t.isPaid, status: !t.isPaid ? TransactionStatus.CONFIRMED : TransactionStatus.PENDING_AUDIT };
+          return t;
+      }));
+  };
 
   if (appState === 'BOOTING' || appState === 'LOADING_DATA') return <Loading message="Sincronizando..." />;
   if (appState === 'CRITICAL_ERROR') return <ErrorScreen error={errorDetails} onRetry={initialize} />;
@@ -154,7 +163,11 @@ const App: React.FC = () => {
           <NavItem icon={Briefcase} label="Cockpit Executivo" view="executive" />
           <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />
           <NavItem icon={List} label="Movimentações" view="transactions" />
-          <NavItem icon={Landmark} label="Contas" view="accounts" />
+          <div className="pt-4 pb-2 text-xs font-bold text-gray-400 uppercase tracking-widest pl-4">Operacional</div>
+          <NavItem icon={TrendingDown} label="Contas a Pagar" view="payable" />
+          <NavItem icon={TrendingUp} label="Contas a Receber" view="receivable" />
+          <div className="pt-4 pb-2 text-xs font-bold text-gray-400 uppercase tracking-widest pl-4">Cadastros</div>
+          <NavItem icon={Landmark} label="Contas Bancárias" view="accounts" />
           <NavItem icon={CreditCard} label="Cartões de Crédito" view="cards" />
           <NavItem icon={Tag} label="Categorias" view="categories" />
           <NavItem icon={MessageSquare} label="Assistente IA" view="chat" />
@@ -174,7 +187,9 @@ const App: React.FC = () => {
         <div className="p-6 lg:p-10 max-w-7xl mx-auto">
           {currentView === 'executive' && <ExecutiveDashboard orgId={orgId || ''} themeColor="indigo" />}
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor="indigo" categories={categories} />}
-          {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransaction} onToggleStatus={()=>{}} />}
+          {currentView === 'transactions' && <TransactionList transactions={transactions} categories={categories} accounts={accounts} onUpdateTransaction={handleUpdateTransaction} onToggleStatus={handleToggleStatus} />}
+          {currentView === 'payable' && <AccountsPayable transactions={transactions} onToggleStatus={handleToggleStatus} onOpenTransactionModal={() => setIsModalOpen(true)} />}
+          {currentView === 'receivable' && <AccountsReceivable transactions={transactions} onToggleStatus={handleToggleStatus} onOpenTransactionModal={() => setIsModalOpen(true)} />}
           {currentView === 'accounts' && <BankAccountManager accounts={accounts} transactions={transactions} onAddAccount={handleAddAccount} onUpdateAccount={()=>{}} onDeleteAccount={()=>{}} />}
           {currentView === 'cards' && <CreditCardManager cards={cards} transactions={transactions} accounts={accounts} onAddCard={(c) => setCards([...cards, c])} onDeleteCard={(id) => setCards(cards.filter(c => c.id !== id))} onAddTransaction={handleSaveTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateCard={handleUpdateCard} />}
           {currentView === 'categories' && <CategoryManager categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={()=>{}} onDeleteCategory={()=>{}} />}

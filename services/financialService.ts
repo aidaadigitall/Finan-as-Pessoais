@@ -26,7 +26,10 @@ export const financialService = {
         accountId: t.account_id,
         destinationAccountId: t.destination_account_id,
         credit_card_id: t.credit_card_id,
-        reconciled: t.reconciled
+        reconciled: t.reconciled,
+        installmentId: t.installment_id,
+        installmentNumber: t.installment_number,
+        installmentCount: t.installment_count
       }));
     } catch (e) {
       console.error("Erro ao carregar transações:", e);
@@ -82,31 +85,56 @@ export const financialService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    const { error } = await supabase.from('transactions').insert({
-      description: t.description,
-      amount: t.amount,
-      type: t.type,
-      category: t.category,
-      date: t.date || new Date().toISOString(),
-      due_date: t.dueDate,
-      is_paid: t.isPaid,
-      account_id: t.accountId,
-      destination_account_id: t.destinationAccountId,
-      credit_card_id: t.creditCardId,
-      organization_id: orgId,
-      user_id: user.id,
-      source: t.source || 'manual'
-    });
+    const transactionsToInsert = [];
+    const installmentCount = t.installmentCount && t.installmentCount > 1 ? t.installmentCount : 1;
+    const installmentId = installmentCount > 1 ? crypto.randomUUID() : null;
+    const baseDate = new Date(t.date || new Date().toISOString());
+    // Se for parcelado, o valor total é dividido, OU o usuário inseriu o valor da parcela. 
+    // Assumiremos aqui que o modal envia o VALOR DA PARCELA já calculado ou o usuário inseriu o valor mensal.
+    // Se quiséssemos dividir o total: const amountPerInstallment = t.amount! / installmentCount;
+    const amount = t.amount; 
+
+    for (let i = 0; i < installmentCount; i++) {
+        const currentDate = new Date(baseDate);
+        currentDate.setMonth(baseDate.getMonth() + i);
+        
+        // Ajuste para datas de vencimento no final do mês (ex: 31 de Jan -> 28 de Fev)
+        if (currentDate.getDate() !== baseDate.getDate()) {
+            currentDate.setDate(0);
+        }
+
+        const isPaid = i === 0 ? t.isPaid : false; // Geralmente só a primeira parcela é paga na hora, o resto é futuro
+
+        transactionsToInsert.push({
+            description: installmentCount > 1 ? `${t.description} (${i + 1}/${installmentCount})` : t.description,
+            amount: amount,
+            type: t.type,
+            category: t.category,
+            date: currentDate.toISOString(),
+            due_date: t.dueDate ? new Date(new Date(t.dueDate).setMonth(new Date(t.dueDate).getMonth() + i)).toISOString() : currentDate.toISOString(),
+            is_paid: isPaid,
+            account_id: t.accountId,
+            destination_account_id: t.destinationAccountId,
+            credit_card_id: t.creditCardId,
+            organization_id: orgId,
+            user_id: user.id,
+            source: t.source || 'manual',
+            installment_id: installmentId,
+            installment_number: installmentCount > 1 ? i + 1 : null,
+            installment_count: installmentCount > 1 ? installmentCount : null
+        });
+    }
+
+    const { error } = await supabase.from('transactions').insert(transactionsToInsert);
     if (error) throw error;
   },
 
   async createBankAccount(acc: Partial<BankAccount>, orgId: string): Promise<void> {
-    // Verificamos se orgId está presente
     if (!orgId) throw new Error("ID da organização não encontrado");
 
     const payload = {
       name: acc.name,
-      bank_name: acc.bankName, // Certifique-se que no SQL do Supabase a coluna é bank_name
+      bank_name: acc.bankName,
       initial_balance: acc.initialBalance || 0,
       current_balance: acc.initialBalance || 0,
       color: acc.color || 'indigo',
