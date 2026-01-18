@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, Category, RecurrenceFrequency, RecurrenceLabels, BankAccount } from '../types';
-import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText, Bot, User } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, Search, Download, Calendar, Edit2, Save, X, Trash2, Repeat, Eye, Info, ArrowRightLeft, Landmark, FileSpreadsheet, FileText, Bot, User, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { exportToPDF, exportToExcel } from '../services/exportService';
 
 interface TransactionListProps {
@@ -12,10 +12,16 @@ interface TransactionListProps {
   onToggleStatus: (id: string) => void;
 }
 
+type SortConfig = {
+    key: keyof Transaction | 'accountName';
+    direction: 'asc' | 'desc';
+} | null;
+
 export const TransactionList: React.FC<TransactionListProps> = ({ transactions, categories, accounts = [], onUpdateTransaction, onToggleStatus }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -24,65 +30,88 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   // Modal details state
   const [detailsModalId, setDetailsModalId] = useState<string | null>(null);
 
-  // 1. Sort by date desc
-  const sorted = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const getAccountName = (id?: string) => accounts.find(a => a.id === id)?.name || 'Conta Padrão';
 
-  // 2. Filter logic
-  const filteredTransactions = sorted.filter(t => {
-    const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.category.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    let matchesDate = true;
-    if (startDate) {
-        matchesDate = matchesDate && new Date(t.date) >= new Date(startDate);
-    }
-    if (endDate) {
-        // Set end date to end of day
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        matchesDate = matchesDate && new Date(t.date) <= end;
-    }
+  // 1. Filter logic
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            t.category.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      let matchesDate = true;
+      if (startDate) {
+          matchesDate = matchesDate && new Date(t.date) >= new Date(startDate);
+      }
+      if (endDate) {
+          // Set end date to end of day
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          matchesDate = matchesDate && new Date(t.date) <= end;
+      }
 
-    return matchesSearch && matchesDate;
-  });
+      return matchesSearch && matchesDate;
+    });
+  }, [transactions, searchTerm, startDate, endDate]);
+
+  // 2. Sorting Logic
+  const sortedTransactions = useMemo(() => {
+    let sortableItems = [...filteredTransactions];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue: any = a[sortConfig.key as keyof Transaction];
+        let bValue: any = b[sortConfig.key as keyof Transaction];
+
+        // Handle specific sorting cases
+        if (sortConfig.key === 'accountName') {
+            aValue = getAccountName(a.accountId);
+            bValue = getAccountName(b.accountId);
+        } else if (sortConfig.key === 'date') {
+            aValue = new Date(a.date).getTime();
+            bValue = new Date(b.date).getTime();
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    } else {
+        // Default sort by date desc
+        sortableItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+    return sortableItems;
+  }, [filteredTransactions, sortConfig, accounts]);
+
+  const requestSort = (key: keyof Transaction | 'accountName') => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: keyof Transaction | 'accountName') => {
+      if (!sortConfig || sortConfig.key !== key) return <ArrowUpDown size={12} className="text-gray-300" />;
+      if (sortConfig.direction === 'asc') return <ArrowUp size={12} className="text-indigo-600" />;
+      return <ArrowDown size={12} className="text-indigo-600" />;
+  };
 
   // Export CSV/Excel/PDF Handlers
   const handleExportPDF = () => {
-      exportToPDF(filteredTransactions, accounts, { 
+      exportToPDF(sortedTransactions, accounts, { 
           fileName: `lancamentos_finai_${new Date().toISOString().slice(0,10)}.pdf`,
           companyName: 'FinAI Ledger' 
       });
   };
 
   const handleExportExcel = () => {
-      exportToExcel(filteredTransactions, accounts, `lancamentos_finai_${new Date().toISOString().slice(0,10)}.xlsx`);
+      exportToExcel(sortedTransactions, accounts, `lancamentos_finai_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
   // Edit Logic
-  const startEdit = (t: Transaction) => {
-    setEditingId(t.id);
-    setEditForm({ ...t, recurrence: t.recurrence || 'none' });
-    setDetailsModalId(null);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm({});
-  };
-
-  const saveEdit = () => {
-    if (editingId && editForm) {
-        const updated = { ...transactions.find(t => t.id === editingId)!, ...editForm };
-        onUpdateTransaction(updated);
-        setEditingId(null);
-        setEditForm({});
-    }
-  };
-
-  const handleEditChange = (field: keyof Transaction, value: any) => {
-      setEditForm(prev => ({ ...prev, [field]: value }));
-  };
-  
   const openDetails = (id: string) => {
       setDetailsModalId(id);
   }
@@ -95,7 +124,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       onUpdateTransaction({ ...t, reconciled: !t.reconciled });
   };
 
-  const getAccountName = (id?: string) => accounts.find(a => a.id === id)?.name || 'Conta Padrão';
   const selectedTransaction = transactions.find(t => t.id === detailsModalId);
 
   return (
@@ -151,20 +179,50 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-gray-600 dark:text-gray-300">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase text-gray-500 dark:text-gray-400">
+          <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs uppercase text-gray-500 dark:text-gray-400 select-none">
             <tr>
-              <th className="px-6 py-3">Data</th>
-              <th className="px-6 py-3">Descrição</th>
-              <th className="px-6 py-3">Conta</th>
-              <th className="px-6 py-3">Categoria</th>
-              <th className="px-6 py-3">Valor</th>
-              <th className="px-6 py-3">Status</th>
+              <th 
+                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                onClick={() => requestSort('date')}
+              >
+                 <div className="flex items-center gap-1">DATA {getSortIcon('date')}</div>
+              </th>
+              <th 
+                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                onClick={() => requestSort('description')}
+              >
+                 <div className="flex items-center gap-1">DESCRIÇÃO {getSortIcon('description')}</div>
+              </th>
+              <th 
+                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                onClick={() => requestSort('accountName')}
+              >
+                 <div className="flex items-center gap-1">CONTA {getSortIcon('accountName')}</div>
+              </th>
+              <th 
+                 className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                 onClick={() => requestSort('category')}
+              >
+                  <div className="flex items-center gap-1">CATEGORIA {getSortIcon('category')}</div>
+              </th>
+              <th 
+                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                onClick={() => requestSort('amount')}
+              >
+                 <div className="flex items-center gap-1">VALOR {getSortIcon('amount')}</div>
+              </th>
+              <th 
+                className="px-6 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                onClick={() => requestSort('isPaid')}
+              >
+                 <div className="flex items-center gap-1">STATUS {getSortIcon('isPaid')}</div>
+              </th>
               <th className="px-6 py-3 text-center">Conciliar</th>
               <th className="px-6 py-3 text-center">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {filteredTransactions.map((t) => {
+            {sortedTransactions.map((t) => {
               const isEditing = editingId === t.id;
 
               return (

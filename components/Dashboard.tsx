@@ -37,7 +37,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
   const parentCategoryData = useMemo(() => {
     const data: Record<string, number> = {};
     filteredTransactions
-      .filter(t => t.type === TransactionType.EXPENSE && t.status === TransactionStatus.CONFIRMED)
+      .filter(t => t.type === TransactionType.EXPENSE && t.isPaid) // Considera apenas pagos para o gráfico de pizza também
       .forEach(t => {
         const cat = categoryMap.get(t.category);
         let parentName = t.category;
@@ -63,7 +63,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
 
     const data: Record<string, number> = {};
     filteredTransactions
-      .filter(t => t.type === TransactionType.EXPENSE && t.status === TransactionStatus.CONFIRMED)
+      .filter(t => t.type === TransactionType.EXPENSE && t.isPaid)
       .forEach(t => {
         const cat = categoryMap.get(t.category);
         if (cat && (cat.id === parent.id || cat.parentId === parent.id)) {
@@ -76,9 +76,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
       .sort((a, b) => b.value - a.value);
   }, [selectedParentCategory, filteredTransactions, categoryMap, categories]);
 
+  // Cálculo de totais (Cards Superiores)
   const stats = filteredTransactions.reduce(
     (acc, curr) => {
-      if (curr.status !== TransactionStatus.CONFIRMED) return acc;
+      // CORREÇÃO: Verifica estritamente se está PAGO (isPaid). 
+      // Se estiver pendente, não soma no saldo líquido nem nos totais.
+      if (!curr.isPaid) return acc;
+
       const amount = curr.amount || 0;
       if (curr.type === TransactionType.INCOME) { acc.income += amount; acc.balance += amount; }
       else if (curr.type === TransactionType.EXPENSE) { acc.expense += amount; acc.balance -= amount; }
@@ -95,7 +99,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
          <div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">Análise Estratégica</h2>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Visão detalhada de categorias e subcategorias.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Visão detalhada do fluxo de caixa realizado.</p>
          </div>
          <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
             <button onClick={() => setPeriod('monthly')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${period === 'monthly' ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>MÊS</button>
@@ -105,7 +109,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, themeColor, 
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-indigo-600 p-6 rounded-[2rem] text-white shadow-xl">
-           <p className="text-indigo-100 text-xs font-black uppercase tracking-widest mb-1">Saldo Líquido</p>
+           <p className="text-indigo-100 text-xs font-black uppercase tracking-widest mb-1">Saldo Líquido (Realizado)</p>
            <h3 className="text-3xl font-black">{formatCurrency(stats.balance)}</h3>
         </div>
         <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm">
