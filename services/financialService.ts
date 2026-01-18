@@ -124,12 +124,15 @@ export const financialService = {
   },
 
   async createCategory(cat: Partial<Category>, orgId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    
     const { error } = await supabase.from('categories').insert({
       name: cat.name,
       type: cat.type,
       parent_id: cat.parentId && !cat.parentId.startsWith('temp-') ? cat.parentId : null,
       budget_limit: cat.budgetLimit || 0,
-      organization_id: orgId
+      organization_id: orgId,
+      user_id: user?.id
     });
     if (error) throw error;
   },
