@@ -58,3 +58,10 @@ CREATE POLICY "Organization members can delete credit cards" ON public.credit_ca
             SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid()
         )
     );
+
+-- CORREÇÃO IMPORTANTE: Adiciona colunas faltantes na tabela de transações
+-- Isso resolve o erro "Could not find the 'category' column" e prepara para o parcelamento
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS category TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_id UUID;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_number INTEGER;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS installment_count INTEGER;
