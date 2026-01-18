@@ -163,7 +163,6 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden font-sans">
       <ConnectionGuard isOnline={appState === 'READY'} isDemoMode={isDemoMode} onRetry={() => { setIsDemoMode(false); initialize(); }} onContinueOffline={() => setIsDemoMode(true)} />
 
-      {/* Sidebar - Adjusted for toggle functionality */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-[#1c2128] border-r border-gray-200 dark:border-gray-800 p-6 flex flex-col transition-transform duration-300 transform lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-10 flex items-center justify-between gap-3 px-2">
           <div className="flex items-center gap-3">
@@ -191,7 +190,6 @@ const App: React.FC = () => {
       </aside>
 
       <main className="flex-1 overflow-y-auto relative bg-[#f8fafc] dark:bg-[#0b0e14]">
-        {/* Adjusted Header with Toggle Button */}
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#1c2128]/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500">
@@ -206,7 +204,6 @@ const App: React.FC = () => {
           </button>
         </header>
 
-        {/* Content expanded (max-w-none) for better space usage */}
         <div className="p-6 lg:p-8 w-full">
           {currentView === 'dashboard' && <Dashboard transactions={transactions} themeColor={themeColor} categories={categories} />}
           {currentView === 'transactions' && (
@@ -236,6 +233,7 @@ const App: React.FC = () => {
               transactions={transactions} 
               onAddCard={(c) => setCards(prev => [...prev, c])} 
               onDeleteCard={(id) => setCards(prev => prev.filter(c => c.id !== id))} 
+              themeColor={themeColor}
             />
           )}
           {currentView === 'categories' && (
