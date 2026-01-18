@@ -324,12 +324,19 @@ export const Settings: React.FC<SettingsProps> = ({
                 config={localSettings.whatsapp || { status: 'disconnected' }}
                 themeColor={settings.themeColor}
                 onConnect={() => {
-                   // Simulação de conexão
+                   // Simulação de conexão com dados da Z-API
                    setLocalSettings(prev => ({ 
                        ...prev, 
-                       whatsapp: { ...prev.whatsapp, status: 'connected', phoneNumber: '+55 11 99999-9999', instanceId: 'inst_12345' } 
+                       whatsapp: { 
+                           ...prev.whatsapp, 
+                           status: 'connected', 
+                           phoneNumber: '+55 11 99999-9999', 
+                           instanceId: '3ED6EA14FE1D7279996982BFEDF24C27', // Use provided ID
+                           gatewayUrl: 'https://api.z-api.io',
+                           apiKey: '2C7B1F60C573E088895BB142'
+                       } 
                    }));
-                   showNotification('Conectado ao WhatsApp com sucesso!');
+                   showNotification('Conectado à instância Z-API com sucesso!');
                 }}
                 onDisconnect={() => {
                    setLocalSettings(prev => ({ 

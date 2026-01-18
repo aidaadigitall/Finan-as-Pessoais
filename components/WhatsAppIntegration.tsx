@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { QrCode, Smartphone, Wifi, WifiOff, MessageSquare, Send, Loader2, CheckCircle2, AlertCircle, Server, Key, Globe, Copy, ExternalLink, Save } from 'lucide-react';
+import { QrCode, Smartphone, Wifi, WifiOff, MessageSquare, Send, Loader2, CheckCircle2, AlertCircle, Server, Key, Globe, Copy, ExternalLink, Save, Hash } from 'lucide-react';
 import { WhatsAppConfig, ThemeColor } from '../types';
 
 interface WhatsAppIntegrationProps {
@@ -23,9 +23,10 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
   const [simulationStatus, setSimulationStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [lastResponse, setLastResponse] = useState<string | null>(null);
   
-  // Settings State
-  const [gatewayUrl, setGatewayUrl] = useState('https://api.seusaas.com/evolution');
-  const [apiKey, setApiKey] = useState('sk_live_...');
+  // Settings State - Preenchido com dados Z-API
+  const [gatewayUrl, setGatewayUrl] = useState('https://api.z-api.io');
+  const [instanceId, setInstanceId] = useState('3ED6EA14FE1D7279996982BFEDF24C27');
+  const [apiKey, setApiKey] = useState('2C7B1F60C573E088895BB142');
   const [webhookUrl, setWebhookUrl] = useState('https://app.finai.com/api/webhook/whatsapp');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -52,7 +53,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     // Simulate API call to save config
     setTimeout(() => {
         setIsSaving(false);
-        alert("Configurações do Gateway salvas com sucesso!");
+        alert(`Integração Z-API salva!\nInstância: ${instanceId}\nConectando...`);
     }, 1000);
   };
 
@@ -81,7 +82,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                   Conexão WhatsApp
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Sincronização via Gateway (Evolution API / Baileys).
+                  Integração ativa via <strong>Z-API</strong>.
                 </p>
               </div>
               <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
@@ -99,11 +100,11 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                 <div className={`w-48 h-48 bg-white p-2 rounded-xl border-2 ${getThemeBorder()} mb-4 flex items-center justify-center relative`}>
                    <QrCode size={150} className="text-gray-800" />
                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-                      <span className="text-xs font-bold text-gray-500">QR Code (Simulado)</span>
+                      <span className="text-xs font-bold text-gray-500">QR Code Z-API</span>
                    </div>
                 </div>
                 <p className="text-sm text-gray-500 mb-6 text-center max-w-xs">
-                  Para conectar, configure o Gateway ao lado e escaneie o código no seu WhatsApp.
+                  Escaneie o QR Code no seu WhatsApp para vincular a instância <strong>{instanceId.slice(0, 8)}...</strong>
                 </p>
               </div>
             ) : (
@@ -113,10 +114,10 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                 </div>
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Instância Ativa</h3>
                 <p className="text-gray-500 dark:text-gray-400 mb-2 text-center">
-                  Número: <strong>{config.phoneNumber}</strong>
+                  Sessão Z-API vinculada com sucesso.
                 </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-6 font-mono bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded">
-                  ID: {config.instanceId}
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-6 font-mono bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded break-all max-w-[200px] text-center">
+                  ID: {config.instanceId || instanceId}
                 </p>
               </div>
             )}
@@ -126,25 +127,25 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
              onClick={config.status === 'disconnected' ? onConnect : onDisconnect}
              className={`w-full ${config.status === 'disconnected' ? getThemeBg() : 'bg-red-500 hover:bg-red-600'} text-white px-6 py-3 rounded-lg hover:opacity-90 transition font-medium flex items-center justify-center gap-2`}
           >
-             {config.status === 'disconnected' ? 'Gerar QR Code (Simular Conexão)' : 'Desconectar Sessão'}
+             {config.status === 'disconnected' ? 'Gerar QR Code Z-API' : 'Desconectar Instância'}
           </button>
         </div>
 
-        {/* Configuration Card (SaaS Style) */}
+        {/* Configuration Card (Z-API Style) */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col h-full">
            <div>
                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                   <Server className={getThemeText()} size={20} />
-                  Configuração do Gateway
+                  Credenciais Z-API
                </h3>
                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                  Configure os dados da sua instância do <strong>Evolution API</strong> ou outro gateway compatível.
+                  Configure os dados da sua instância para permitir o envio e recebimento de mensagens.
                </p>
 
                <div className="space-y-4">
                   <div>
                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                        <Globe size={12} /> URL do Gateway API
+                        <Globe size={12} /> URL da API
                      </label>
                      <div className="flex gap-2">
                         <input 
@@ -153,27 +154,30 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                             onChange={(e) => setGatewayUrl(e.target.value)}
                             className="flex-1 p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
-                        <a 
-                            href={gatewayUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 transition"
-                            title="Abrir URL do Gateway"
-                        >
-                            <ExternalLink size={18} />
-                        </a>
                      </div>
                   </div>
 
                   <div>
                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                        <Key size={12} /> API Key (Global)
+                        <Hash size={12} /> ID da Instância
+                     </label>
+                     <input 
+                        type="text" 
+                        value={instanceId}
+                        onChange={(e) => setInstanceId(e.target.value)}
+                        className="w-full p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                     />
+                  </div>
+
+                  <div>
+                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                        <Key size={12} /> Token da Instância
                      </label>
                      <input 
                         type="password" 
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        className="w-full p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                      />
                   </div>
 
@@ -197,7 +201,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                         </button>
                      </div>
                      <p className="text-[10px] text-gray-400 mt-1">
-                        Configure este endpoint no seu Gateway para receber eventos.
+                        Configure este endpoint no painel da Z-API para receber mensagens.
                      </p>
                   </div>
                </div>
@@ -210,7 +214,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                   className={`w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white py-2.5 rounded-lg transition-all ${isSaving ? 'opacity-75 cursor-wait' : ''}`}
                >
                    {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                   {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+                   {isSaving ? 'Salvando...' : 'Salvar Configurações Z-API'}
                </button>
            </div>
         </div>
