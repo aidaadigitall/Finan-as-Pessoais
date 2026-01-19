@@ -64,14 +64,20 @@ export const Settings: React.FC<SettingsProps> = ({
   };
 
   const handleSaveSystem = () => {
+      // 1. Atualiza estado global
       onUpdateSettings(localSettings);
       
-      // Salvar API Keys especificamente no LocalStorage para o Service usar
+      // 2. Salva API Keys especificamente no LocalStorage para o Service (Simulador) usar imediatamente
       if (localSettings.apiKeys.gemini) {
           localStorage.setItem('finai_api_key_gemini', localSettings.apiKeys.gemini);
+      } else {
+          localStorage.removeItem('finai_api_key_gemini');
       }
+
       if (localSettings.apiKeys.openai) {
           localStorage.setItem('finai_api_key_openai', localSettings.apiKeys.openai);
+      } else {
+          localStorage.removeItem('finai_api_key_openai');
       }
 
       showNotification('Configurações salvas e chaves de API atualizadas!');
@@ -169,7 +175,7 @@ export const Settings: React.FC<SettingsProps> = ({
           } else {
              const advice = await getFinancialAdvice(message, transactions, categories);
              console.log("Resposta IA:", advice);
-             showNotification(`🤖 IA Respondeu (ver console)`, 'info');
+             showNotification(`🤖 IA Respondeu: ${advice.substring(0, 50)}...`, 'info');
              return; 
           }
       } catch (e: any) {

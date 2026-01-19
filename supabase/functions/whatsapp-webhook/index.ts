@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GoogleGenAI } from "npm:@google/genai";
@@ -7,106 +8,129 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  try {
-    // 1. Configuração de Ambiente (Deno Native)
-    // Fix: Cast Deno to any to avoid TypeScript errors when Deno types are not fully loaded in the editor context
-    const supabaseUrl = (Deno as any).env.get('SUPABASE_URL') ?? '';
-    const supabaseKey = (Deno as any).env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const geminiKey = (Deno as any).env.get('GEMINI_API_KEY');
-
-    if (!supabaseUrl || !supabaseKey) {
-        throw new Error("Missing Supabase credentials in Edge Function Secrets");
-    }
-    if (!geminiKey) {
-        throw new Error("GEMINI_API_KEY is not set in Edge Function Secrets");
-    }
-
-    // Initialize Supabase Client
-    const supabaseClient = createClient(supabaseUrl, supabaseKey);
-
-    const body = await req.json();
-    console.log("Webhook Payload:", JSON.stringify(body));
-
-    let text = "";
-    const messageData = body;
-
-    // Ignorar mensagens enviadas por mim mesmo (Loop prevention)
-    if (messageData.fromMe) {
-       return new Response(JSON.stringify({ message: "Ignored (from me)" }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
-
-    // Estratégia de extração de texto (Z-API e similares)
-    if (messageData.text && messageData.text.message) {
-        text = messageData.text.message; 
-    } else if (typeof messageData.text === 'string') {
-        text = messageData.text;
-    } else if (messageData.message) {
-        text = messageData.message;
-    } else if (messageData.conversation) {
-        text = messageData.conversation;
-    }
-
-    if (!text) {
-       return new Response(JSON.stringify({ message: "No text found to process" }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
-
-    // Initialize Gemini AI
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
-
-    const { data: categoriesData } = await supabaseClient.from('categories').select('name').limit(20);
-    const categoryList = categoriesData?.map((c: any) => c.name).join(', ') || "Alimentação, Transporte, Lazer, Contas, Receita, Outros";
-
+// --- FUNÇÃO AUXILIAR: CHAMAR OPENAI ---
+async function analyzeWithOpenAI(apiKey: string, text: string, categories: string): Promise<any> {
     const prompt = `
-      Atue como um interpretador bancário. Analise esta mensagem de WhatsApp: "${text}".
-      
-      Seu objetivo é extrair dados de uma transação financeira, se houver.
-      Categorias sugeridas: ${categoryList}.
+      Atue como um interpretador bancário. Analise: "${text}".
+      Categorias: ${categories}.
       
       Regras:
-      - Se o usuário disser "Gastei 50 no mercado", type="expense", category="Alimentação".
-      - Se disser "Recebi 1000", type="income".
-      - Se não for transação financeira clara, "isTransaction": false.
+      - "Gastei 50 no mercado" -> type="expense", category="Alimentação".
+      - "Recebi 1000" -> type="income".
+      - Se não for financeiro, "isTransaction": false.
       
-      Retorne JSON PURO (sem markdown): 
+      JSON PURO: 
+      { "isTransaction": boolean, "description": string, "amount": number, "type": "income"|"expense", "category": "string" }
+    `;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [{ role: "system", content: "Você retorna apenas JSON." }, { role: "user", content: prompt }],
+            response_format: { type: "json_object" }
+        })
+    });
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+    return JSON.parse(content);
+}
+
+// --- FUNÇÃO AUXILIAR: CHAMAR GEMINI ---
+async function analyzeWithGemini(apiKey: string, text: string, categories: string): Promise<any> {
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `
+      Atue como um interpretador bancário. Analise: "${text}".
+      Categorias: ${categories}.
+      
+      Regras:
+      - "Gastei 50 no mercado" -> type="expense", category="Alimentação".
+      - "Recebi 1000" -> type="income".
+      - Se não for financeiro, "isTransaction": false.
+      
+      JSON PURO (sem markdown): 
       { "isTransaction": boolean, "description": string, "amount": number, "type": "income"|"expense", "category": "string" }
     `;
 
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
-        config: {
-            responseMimeType: "application/json"
-        }
+        config: { responseMimeType: "application/json" }
     });
     
     const cleanJson = response.text?.replace(/```json|```/g, "").trim() || "{}";
+    return JSON.parse(cleanJson);
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = (Deno as any).env.get('SUPABASE_URL') ?? '';
+    const supabaseKey = (Deno as any).env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     
-    let analysis;
-    try {
-        analysis = JSON.parse(cleanJson);
-    } catch (e) {
-        console.error("Falha ao parsear JSON da IA:", cleanJson);
-        return new Response(JSON.stringify({ error: "AI Parsing Error" }), { headers: corsHeaders, status: 500 });
+    // Suporte Híbrido: Verifica ambas as chaves
+    const geminiKey = (Deno as any).env.get('GEMINI_API_KEY');
+    const openAiKey = (Deno as any).env.get('OPENAI_API_KEY');
+
+    if (!supabaseUrl || !supabaseKey) {
+        throw new Error("Missing Supabase credentials");
     }
 
-    if (analysis.isTransaction) {
-        // Busca organização. Em produção, buscar via telefone do usuário na tabela profiles.
+    if (!geminiKey && !openAiKey) {
+        throw new Error("Nenhuma chave de IA (Gemini ou OpenAI) configurada nos Secrets.");
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+    const body = await req.json();
+    
+    // Ignorar mensagens próprias
+    if (body.fromMe) return new Response(JSON.stringify({ ignored: true }), { headers: corsHeaders });
+
+    // Extração de texto (compatível com Z-API e outros)
+    let text = body.text?.message || body.text || body.message || body.conversation || "";
+
+    if (!text) return new Response(JSON.stringify({ msg: "No text" }), { headers: corsHeaders });
+
+    // Buscar categorias para contexto
+    const { data: categoriesData } = await supabaseClient.from('categories').select('name').limit(20);
+    const categoryList = categoriesData?.map((c: any) => c.name).join(', ') || "Outros";
+
+    let analysis;
+    
+    // Lógica de Prioridade: Gemini (Rápido/Barato) -> OpenAI (Fallback/Potente)
+    try {
+        if (geminiKey) {
+            console.log("Usando Gemini...");
+            analysis = await analyzeWithGemini(geminiKey, text, categoryList);
+        } else if (openAiKey) {
+            console.log("Usando OpenAI...");
+            analysis = await analyzeWithOpenAI(openAiKey, text, categoryList);
+        }
+    } catch (aiError: any) {
+        console.error("Erro na IA principal:", aiError);
+        // Fallback reverso simples
+        if (geminiKey && openAiKey) {
+             console.log("Tentando fallback para OpenAI...");
+             analysis = await analyzeWithOpenAI(openAiKey, text, categoryList);
+        } else {
+             throw aiError;
+        }
+    }
+
+    if (analysis && analysis.isTransaction) {
         const { data: orgs } = await supabaseClient.from('organizations').select('id').limit(1);
         const orgId = orgs?.[0]?.id;
 
         if (orgId) {
-            const { error: insertError } = await supabaseClient.from('transactions').insert({
+            await supabaseClient.from('transactions').insert({
                 description: analysis.description,
                 amount: analysis.amount,
                 type: analysis.type,
@@ -116,14 +140,7 @@ serve(async (req) => {
                 source: 'whatsapp_bot',
                 organization_id: orgId
             });
-
-            if (insertError) {
-                console.error("Erro ao inserir:", insertError);
-                throw insertError;
-            }
-            console.log("Transação salva:", analysis);
-        } else {
-            console.error("Nenhuma organização encontrada para salvar a transação.");
+            console.log("Transação salva via Webhook");
         }
     }
 
@@ -133,7 +150,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error("Critical Error:", error);
+    console.error("Webhook Error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

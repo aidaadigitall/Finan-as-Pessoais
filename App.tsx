@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isConfigured } from './lib/supabase';
 import { authService } from './services/authService';
 import { financialService } from './services/financialService';
@@ -83,6 +83,9 @@ const App: React.FC = () => {
     onConfirm: () => {}
   });
 
+  // Ref para evitar loops de re-renderização
+  const isInitialized = useRef(false);
+
   const showNotification = (message: string, type: ToastType = 'success') => {
       setNotification({ message, type });
   };
@@ -90,6 +93,7 @@ const App: React.FC = () => {
   const handleUpdateSettings = async (newSettings: SystemSettings) => {
       setSystemSettings(newSettings);
       
+      // Persistência local imediata para uso nos serviços
       if (newSettings.apiKeys?.gemini) localStorage.setItem('finai_api_key_gemini', newSettings.apiKeys.gemini);
       if (newSettings.apiKeys?.openai) localStorage.setItem('finai_api_key_openai', newSettings.apiKeys.openai);
 
@@ -104,7 +108,6 @@ const App: React.FC = () => {
       }
   };
 
-  // Implementação correta de salvar perfil no banco
   const handleUpdateProfile = async (newProfile: UserProfile) => {
       setUserProfile(newProfile); // Atualiza UI imediatamente
       if (newProfile.id) {
@@ -121,7 +124,6 @@ const App: React.FC = () => {
       }
   };
 
-  // loadData agora aceita parâmetro 'silent' para não mostrar tela de carregamento
   const loadData = useCallback(async (id: string, silent: boolean = false) => {
     try {
       if (!silent) setAppState('LOADING_DATA');
@@ -149,12 +151,15 @@ const App: React.FC = () => {
       const savedRules = offlineService.get<AIRule[]>('ai_rules', []);
       setUserRules(savedRules);
 
-      setAppState('READY');
+      if (!silent) setAppState('READY');
     } catch (e: any) {
-      setErrorDetails(e.message);
-      setAppState('CRITICAL_ERROR');
+      console.error(e);
+      if (!silent) {
+          setErrorDetails(e.message);
+          setAppState('CRITICAL_ERROR');
+      }
     }
-  }, []);
+  }, []); // Dependência vazia para evitar recriação constante
 
   const handleUpdateRules = (rules: AIRule[]) => {
       setUserRules(rules);
@@ -163,6 +168,9 @@ const App: React.FC = () => {
   };
 
   const initialize = useCallback(async () => {
+    // Evita inicialização dupla
+    if (isInitialized.current) return;
+    
     if (!isConfigured) {
       setAppState('CRITICAL_ERROR');
       setErrorDetails("Configuração do Supabase pendente.");
@@ -175,43 +183,54 @@ const App: React.FC = () => {
       return;
     }
 
-    // Carrega dados do perfil do banco, não apenas da sessão
-    const dbProfile = await authService.getUserProfile(session.user.id);
+    isInitialized.current = true;
+    setAppState('LOADING_DATA');
 
-    setUserProfile({
+    // Recupera perfil completo
+    let currentProfile: UserProfile = {
         id: session.user.id,
         email: session.user.email!,
-        name: dbProfile?.full_name || session.user.email!.split('@')[0],
-        avatarUrl: dbProfile?.avatar_url,
+        name: session.user.email!.split('@')[0],
         role: 'owner'
-    });
+    };
 
     try {
+      const dbProfile = await authService.getUserProfile(session.user.id);
+      if (dbProfile) {
+          currentProfile = {
+              ...currentProfile,
+              name: dbProfile.full_name || currentProfile.name,
+              avatarUrl: dbProfile.avatar_url
+          };
+      }
+      setUserProfile(currentProfile);
+
       const id = await authService.ensureUserResources(session.user.id, session.user.email!);
       setOrgId(id);
-      await loadData(id);
+      await loadData(id, false); // False = mostra loading inicial
     } catch (e: any) {
       setAppState('CRITICAL_ERROR');
       setErrorDetails(e.message);
+      isInitialized.current = false; // Permite tentar de novo
     }
   }, [loadData]);
 
+  // Hook de Inicialização
   useEffect(() => {
     initialize();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // SÓ reinicializa se for um login explícito.
-      // Mudança de aba (FOCUS) não deve disparar LOADING_DATA se já estiver logado.
       if (event === 'SIGNED_IN' && session) {
-         // Verificamos se já estamos prontos para evitar loop
-         if (appState !== 'READY' && appState !== 'LOADING_DATA') {
-             initialize();
-         }
+         if (!isInitialized.current) initialize();
       }
-      if (event === 'SIGNED_OUT') setAppState('AUTH_REQUIRED');
+      if (event === 'SIGNED_OUT') {
+          setAppState('AUTH_REQUIRED');
+          isInitialized.current = false;
+          setOrgId(null);
+      }
     });
     return () => subscription.unsubscribe();
-  }, [initialize]); // Remove appState from dependency to avoid loop
+  }, [initialize]);
 
   // --- REALTIME SUBSCRIPTION ---
   useEffect(() => {
@@ -230,8 +249,7 @@ const App: React.FC = () => {
           filter: `organization_id=eq.${orgId}`
         },
         (payload) => {
-          console.log('Alteração recebida via WhatsApp/Realtime:', payload);
-          // IMPORTANTE: loadData com SILENT = TRUE para não travar a tela
+          // Atualização silenciosa para não travar a UI
           loadData(orgId, true).then(() => {
              if (payload.eventType === 'INSERT') {
                  showNotification('Novo lançamento sincronizado!', 'info');
@@ -427,7 +445,7 @@ const App: React.FC = () => {
   
   const openNewTransactionModal = (type: TransactionType = TransactionType.EXPENSE) => {
       setTransactionToEdit(null);
-      setInitialModalType(type); // Define a modalidade inicial (Receita/Despesa/Transf)
+      setInitialModalType(type);
       setIsModalOpen(true);
   };
 
@@ -476,7 +494,7 @@ const App: React.FC = () => {
   };
 
   if (appState === 'BOOTING' || appState === 'LOADING_DATA') return <Loading message="Sincronizando..." />;
-  if (appState === 'CRITICAL_ERROR') return <ErrorScreen error={errorDetails} onRetry={initialize} />;
+  if (appState === 'CRITICAL_ERROR') return <ErrorScreen error={errorDetails} onRetry={() => { isInitialized.current = false; initialize(); }} />;
   
   if (appState === 'AUTH_REQUIRED') return (
      <Auth 
