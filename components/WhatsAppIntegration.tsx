@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QrCode, Smartphone, Wifi, WifiOff, MessageSquare, Send, Loader2, CheckCircle2, AlertCircle, Server, Key, Globe, Copy, ExternalLink, Save, Hash } from 'lucide-react';
 import { WhatsAppConfig, ThemeColor } from '../types';
 
 interface WhatsAppIntegrationProps {
   config: WhatsAppConfig;
-  onConnect: () => void;
+  onSaveConfig: (newConfig: Partial<WhatsAppConfig>) => Promise<void>;
   onDisconnect: () => void;
   onSimulateMessage: (message: string) => Promise<void>;
   themeColor: ThemeColor;
@@ -13,7 +13,7 @@ interface WhatsAppIntegrationProps {
 
 export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({ 
   config, 
-  onConnect, 
+  onSaveConfig,
   onDisconnect, 
   onSimulateMessage,
   themeColor 
@@ -21,15 +21,21 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
   const [simulationText, setSimulationText] = useState('');
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationStatus, setSimulationStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [lastResponse, setLastResponse] = useState<string | null>(null);
   
-  // Settings State - Configurado com os dados completos (ID e Token) da Z-API
-  const [gatewayUrl, setGatewayUrl] = useState('https://api.z-api.io');
-  const [instanceId, setInstanceId] = useState('3ED6EA14FE1D7279996982BFEDF24C27');
-  const [apiKey, setApiKey] = useState('2C7B1F60C573E088895BB142'); // Token configurado
+  // Inicializa o estado com as props ou valores padrão
+  const [gatewayUrl, setGatewayUrl] = useState(config.gatewayUrl || 'https://api.z-api.io');
+  const [instanceId, setInstanceId] = useState(config.instanceId || '');
+  const [apiKey, setApiKey] = useState(config.apiKey || '');
   
-  // Webhook correto apontando para o Supabase do usuário
-  const [webhookUrl, setWebhookUrl] = useState('https://aqimvhbgujedzyrpjogx.supabase.co/functions/v1/whatsapp-webhook');
+  // Atualiza os inputs se a config externa mudar (ex: carregamento do banco)
+  useEffect(() => {
+    if (config.instanceId) setInstanceId(config.instanceId);
+    if (config.apiKey) setApiKey(config.apiKey);
+    if (config.gatewayUrl) setGatewayUrl(config.gatewayUrl);
+  }, [config]);
+
+  // Webhook fixo (baseado no projeto)
+  const webhookUrl = 'https://aqimvhbgujedzyrpjogx.supabase.co/functions/v1/whatsapp-webhook';
   
   const [isSaving, setIsSaving] = useState(false);
 
@@ -38,7 +44,6 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     
     setIsSimulating(true);
     setSimulationStatus('idle');
-    setLastResponse(null);
     try {
       await onSimulateMessage(simulationText);
       setSimulationStatus('success');
@@ -50,23 +55,30 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     }
   };
 
-  const handleSaveConfig = () => {
-    if (!apiKey) {
-        alert("Por favor, preencha o Token da Instância (Client Token) que está no painel da Z-API.");
+  const handleSave = async () => {
+    if (!apiKey || !instanceId) {
+        alert("Por favor, preencha o ID da Instância e o Token.");
         return;
     }
     setIsSaving(true);
-    // Simula salvamento
-    setTimeout(() => {
+    try {
+        await onSaveConfig({
+            gatewayUrl,
+            instanceId,
+            apiKey,
+            status: 'connected' // Assumimos conectado ao salvar credenciais válidas
+        });
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao salvar configurações.");
+    } finally {
         setIsSaving(false);
-        // Em um app real, aqui salvaríamos no banco de dados
-        alert(`Integração salva com sucesso!\n\nCertifique-se de copiar o Webhook abaixo e configurar no painel da Z-API para receber as mensagens.`);
-    }, 1000);
+    }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("URL do Webhook copiada!");
+    alert("URL copiada!");
   };
 
   const getThemeText = () => `text-${themeColor}-600`;
@@ -124,18 +136,20 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                   Sessão Z-API vinculada com sucesso.
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mb-6 font-mono bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded break-all max-w-[200px] text-center">
-                  ID: {config.instanceId || instanceId}
+                  ID: {config.instanceId}
                 </p>
               </div>
             )}
           </div>
           
-          <button
-             onClick={config.status === 'disconnected' ? onConnect : onDisconnect}
-             className={`w-full ${config.status === 'disconnected' ? getThemeBg() : 'bg-red-500 hover:bg-red-600'} text-white px-6 py-3 rounded-lg hover:opacity-90 transition font-medium flex items-center justify-center gap-2`}
-          >
-             {config.status === 'disconnected' ? 'Conectar Integração' : 'Desconectar Instância'}
-          </button>
+          {config.status === 'connected' && (
+              <button
+                 onClick={onDisconnect}
+                 className="w-full bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 px-6 py-3 rounded-lg transition font-medium flex items-center justify-center gap-2"
+              >
+                 Desconectar Instância
+              </button>
+          )}
         </div>
 
         {/* Configuration Card (Z-API Style) */}
@@ -146,7 +160,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                   Credenciais Z-API
                </h3>
                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                  Dados extraídos da sua instância. O token foi preenchido automaticamente.
+                  Preencha com os dados do painel da Z-API.
                </p>
 
                <div className="space-y-4">
@@ -181,7 +195,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                         <Key size={12} /> Token da Instância
                      </label>
                      <input 
-                        type="text" 
+                        type="password" 
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
                         placeholder="Cole o token da Z-API aqui..."
@@ -189,7 +203,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                      />
                      {apiKey && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-bold flex items-center gap-1">
-                            <CheckCircle2 size={10} /> Token configurado
+                            <CheckCircle2 size={10} /> Token preenchido
                         </p>
                      )}
                   </div>
@@ -222,12 +236,12 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
 
            <div className="mt-auto pt-6">
                <button 
-                  onClick={handleSaveConfig}
+                  onClick={handleSave}
                   disabled={isSaving}
                   className={`w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white py-2.5 rounded-lg transition-all ${isSaving ? 'opacity-75 cursor-wait' : ''}`}
                >
                    {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                   {isSaving ? 'Salvando...' : 'Salvar Configurações Z-API'}
+                   {isSaving ? 'Salvando...' : 'Salvar Configurações e Conectar'}
                </button>
            </div>
         </div>
@@ -239,10 +253,10 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
              <div>
                  <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
                     <MessageSquare className={getThemeText()} />
-                    Simulador de Webhook (Teste a IA)
+                    Simulador de Webhook
                  </h3>
                  <p className="text-xs text-gray-500 mt-1">
-                     Teste como a IA responderá às mensagens recebidas via WhatsApp sem precisar configurar o gateway real.
+                     Teste a IA sem precisar enviar mensagens reais no WhatsApp.
                  </p>
              </div>
              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-md border border-orange-200 font-bold">
@@ -256,7 +270,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                     <textarea
                       value={simulationText}
                       onChange={(e) => setSimulationText(e.target.value)}
-                      placeholder="Digite como se estivesse no WhatsApp:&#10;'Gastei 120 reais no mercado hoje'&#10;'Como está meu saldo?'"
+                      placeholder="Ex: 'Gastei 120 reais no mercado'"
                       className="w-full h-full min-h-[140px] p-4 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none shadow-sm font-medium"
                       style={{ '--tw-ring-color': `var(--${themeColor}-500)` } as any}
                     />
@@ -267,7 +281,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                             className={`${getThemeBg()} text-white px-4 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2 shadow-md text-sm font-bold`}
                             >
                             {isSimulating ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                            Enviar Mensagem
+                            Enviar
                         </button>
                     </div>
                 </div>
@@ -286,22 +300,18 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                    {isSimulating ? (
                        <>
                            <p><span className="text-green-400">POST</span> {webhookUrl}</p>
-                           <p className="text-blue-300">{`{ "event": "messages.upsert", ... }`}</p>
                            <p className="text-yellow-300 animate-pulse">Processing by Gemini AI...</p>
                        </>
                    ) : simulationStatus === 'success' ? (
                         <>
                            <p className="text-gray-500">// Mensagem recebida</p>
-                           <p className="text-white">User: "{simulationText || '...'}"</p>
-                           <div className="my-2 border-t border-gray-800"></div>
-                           <p className="text-gray-500">// Resposta da IA</p>
-                           <p className="text-green-400">FinAI: Processamento concluído.</p>
-                           <p className="text-indigo-300">Ação: Lançamento/Consulta executada.</p>
+                           <p className="text-green-400">FinAI: Sucesso.</p>
+                           <p className="text-white">Transação identificada e salva.</p>
                         </>
                    ) : simulationStatus === 'error' ? (
-                       <p className="text-red-400">Error: Failed to process message.</p>
+                       <p className="text-red-400">Error: Failed to process.</p>
                    ) : (
-                       <p className="text-gray-500 italic">Aguardando evento...</p>
+                       <p className="text-gray-500 italic">Aguardando...</p>
                    )}
                 </div>
              </div>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Building2, Palette, Brain, Key, Lock, Eye, EyeOff, Upload, Save, Globe, Smartphone, Shield, LogOut, Plus, Trash2, Search, Zap, MessageCircle } from 'lucide-react';
-import { SystemSettings, UserProfile, ThemeColor, AIRule, Category } from '../types';
+import { SystemSettings, UserProfile, ThemeColor, AIRule, Category, WhatsAppConfig } from '../types';
 import { NotificationToast, ToastType } from './NotificationToast';
 import { WhatsAppIntegration } from './WhatsAppIntegration';
 import { analyzeFinancialInput, getFinancialAdvice } from '../services/geminiService';
@@ -54,6 +54,11 @@ export const Settings: React.FC<SettingsProps> = ({
       }));
   }, []);
 
+  // Update localSettings when props change (e.g. initial load)
+  useEffect(() => {
+      setLocalSettings(prev => ({...prev, ...settings}));
+  }, [settings]);
+
   const showNotification = (message: string, type: ToastType = 'success') => {
       setNotification({ message, type });
   };
@@ -70,6 +75,21 @@ export const Settings: React.FC<SettingsProps> = ({
       }
 
       showNotification('Configurações salvas e chaves de API atualizadas!');
+  };
+
+  const handleSaveWhatsApp = async (newConfig: Partial<WhatsAppConfig>) => {
+      const updatedSettings: SystemSettings = {
+          ...localSettings,
+          whatsapp: {
+              ...localSettings.whatsapp,
+              ...newConfig
+          }
+      };
+      
+      setLocalSettings(updatedSettings);
+      // Persiste no banco de dados imediatamente
+      onUpdateSettings(updatedSettings);
+      showNotification('Configurações do WhatsApp salvas com sucesso!');
   };
 
   const handleSaveProfile = () => {
@@ -117,21 +137,13 @@ export const Settings: React.FC<SettingsProps> = ({
 
   // --- LOGICA DE SIMULAÇÃO DE WHATSAPP ---
   const handleWhatsAppSimulation = async (message: string) => {
-      // 1. Verificar se é um pedido de insight/consulta ou transação
       try {
-          // Buscamos transações recentes para contexto se for insight
-          // Precisamos do orgId. Como não recebemos via prop aqui, vamos tentar inferir ou usar um hook em uma refatoração maior.
-          // Por enquanto, assumimos que o financialService consegue pegar o contexto se autenticado, 
-          // mas para criar precisamos passar o orgId. 
-          // WORKAROUND: Vamos buscar a primeira organização do usuário logado via API para garantir.
-          
           // Nota: Em produção real, o webhook receberia o número do telefone e buscaria a Org associada.
           const { data: { user } } = await import('../lib/supabase').then(m => m.supabase.auth.getUser());
           if(!user) throw new Error("Usuário não autenticado.");
           
           // Busca orgId rápida
           const orgId = await import('../services/authService').then(s => s.authService.ensureUserResources(user.id, user.email!));
-
           const transactions = await financialService.getTransactions(orgId);
 
           // Primeiro, tentamos analisar como transação
@@ -153,15 +165,12 @@ export const Settings: React.FC<SettingsProps> = ({
               
               // SALVAMENTO REAL NO BANCO
               await financialService.createTransaction(newT, orgId);
-              
               showNotification(`✅ Lançamento Salvo: ${details.description} - R$ ${details.amount}`);
           } else {
-             // Se não for transação, é insight
              const advice = await getFinancialAdvice(message, transactions, categories);
-             showNotification(`🤖 IA Respondeu (ver console)`, 'info');
-             // Em um app real, devolveriamos a resposta para o chat simulado
              console.log("Resposta IA:", advice);
-             return; // Retorna para o componente saber que acabou
+             showNotification(`🤖 IA Respondeu (ver console)`, 'info');
+             return; 
           }
       } catch (e: any) {
           console.error(e);
@@ -341,28 +350,8 @@ export const Settings: React.FC<SettingsProps> = ({
               <WhatsAppIntegration 
                 config={localSettings.whatsapp || { status: 'disconnected' }}
                 themeColor={settings.themeColor}
-                onConnect={() => {
-                   // Simulação de conexão com dados da Z-API
-                   setLocalSettings(prev => ({ 
-                       ...prev, 
-                       whatsapp: { 
-                           ...prev.whatsapp, 
-                           status: 'connected', 
-                           phoneNumber: '+55 11 99999-9999', 
-                           instanceId: '3ED6EA14FE1D7279996982BFEDF24C27', // Use provided ID
-                           gatewayUrl: 'https://api.z-api.io',
-                           apiKey: '2C7B1F60C573E088895BB142'
-                       } 
-                   }));
-                   showNotification('Conectado à instância Z-API com sucesso!');
-                }}
-                onDisconnect={() => {
-                   setLocalSettings(prev => ({ 
-                       ...prev, 
-                       whatsapp: { ...prev.whatsapp, status: 'disconnected', phoneNumber: undefined, instanceId: undefined } 
-                   }));
-                   showNotification('Sessão desconectada.');
-                }}
+                onSaveConfig={handleSaveWhatsApp}
+                onDisconnect={() => handleSaveWhatsApp({ status: 'disconnected', apiKey: '', instanceId: '' })}
                 onSimulateMessage={handleWhatsAppSimulation}
               />
           )}
