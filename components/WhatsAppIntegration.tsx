@@ -34,7 +34,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     if (config.gatewayUrl) setGatewayUrl(config.gatewayUrl);
   }, [config]);
 
-  // Webhook fixo (baseado no projeto)
+  // Webhook fixo (baseado no seu projeto Supabase)
   const webhookUrl = 'https://aqimvhbgujedzyrpjogx.supabase.co/functions/v1/whatsapp-webhook';
   
   const [isSaving, setIsSaving] = useState(false);
@@ -62,15 +62,38 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     }
     setIsSaving(true);
     try {
+        // 1. Salva no banco de dados do sistema (Supabase)
         await onSaveConfig({
             gatewayUrl,
             instanceId,
             apiKey,
-            status: 'connected' // Assumimos conectado ao salvar credenciais válidas
+            status: 'connected'
         });
+
+        // 2. Tenta configurar o Webhook automaticamente na Z-API
+        try {
+            const cleanGateway = gatewayUrl.replace(/\/$/, '');
+            const zApiUrl = `${cleanGateway}/instances/${instanceId}/token/${apiKey}/update-webhook`;
+
+            const response = await fetch(zApiUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: webhookUrl })
+            });
+
+            if (response.ok) {
+                alert("✅ Sucesso!\n\n1. Configurações salvas no sistema.\n2. Webhook configurado automaticamente na Z-API.");
+            } else {
+                throw new Error("Z-API recusou a configuração automática.");
+            }
+        } catch (apiError) {
+             console.warn(apiError);
+             alert("⚠️ Configurações salvas no sistema, mas não foi possível configurar o Webhook automaticamente na Z-API (Bloqueio de CORS ou Rede).\n\nPor favor, copie o link do Webhook abaixo e cole manualmente no painel da Z-API.");
+        }
+
     } catch (error) {
         console.error(error);
-        alert("Erro ao salvar configurações.");
+        alert("Erro ao salvar configurações no sistema.");
     } finally {
         setIsSaving(false);
     }
