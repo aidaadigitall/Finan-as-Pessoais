@@ -23,11 +23,14 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
   const [simulationStatus, setSimulationStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [lastResponse, setLastResponse] = useState<string | null>(null);
   
-  // Settings State - Preenchido com dados Z-API
+  // Settings State - Configurado com os dados da imagem do usuário
   const [gatewayUrl, setGatewayUrl] = useState('https://api.z-api.io');
   const [instanceId, setInstanceId] = useState('3ED6EA14FE1D7279996982BFEDF24C27');
-  const [apiKey, setApiKey] = useState('2C7B1F60C573E088895BB142');
-  const [webhookUrl, setWebhookUrl] = useState('https://app.finai.com/api/webhook/whatsapp');
+  const [apiKey, setApiKey] = useState(''); // O usuário deve colar o token aqui
+  
+  // Webhook correto apontando para o Supabase do usuário
+  const [webhookUrl, setWebhookUrl] = useState('https://aqimvhbgujedzyrpjogx.supabase.co/functions/v1/whatsapp-webhook');
+  
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSimulate = async () => {
@@ -37,7 +40,6 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     setSimulationStatus('idle');
     setLastResponse(null);
     try {
-      // Aqui a App.tsx vai processar e retornar o que a IA responderia
       await onSimulateMessage(simulationText);
       setSimulationStatus('success');
       setSimulationText('');
@@ -49,17 +51,22 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
   };
 
   const handleSaveConfig = () => {
+    if (!apiKey) {
+        alert("Por favor, preencha o Token da Instância (Client Token) que está no painel da Z-API.");
+        return;
+    }
     setIsSaving(true);
-    // Simulate API call to save config
+    // Simula salvamento
     setTimeout(() => {
         setIsSaving(false);
-        alert(`Integração Z-API salva!\nInstância: ${instanceId}\nConectando...`);
+        // Em um app real, aqui salvaríamos no banco de dados
+        alert(`Integração salva com sucesso!\n\nAgora copie o Webhook abaixo e cole no painel da Z-API.`);
     }, 1000);
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    // Could add a toast here in a full implementation
+    alert("URL do Webhook copiada!");
   };
 
   const getThemeText = () => `text-${themeColor}-600`;
@@ -104,7 +111,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                    </div>
                 </div>
                 <p className="text-sm text-gray-500 mb-6 text-center max-w-xs">
-                  Escaneie o QR Code no seu WhatsApp para vincular a instância <strong>{instanceId.slice(0, 8)}...</strong>
+                  Para conectar, configure as credenciais ao lado e escaneie o QR Code no painel da Z-API.
                 </p>
               </div>
             ) : (
@@ -127,7 +134,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
              onClick={config.status === 'disconnected' ? onConnect : onDisconnect}
              className={`w-full ${config.status === 'disconnected' ? getThemeBg() : 'bg-red-500 hover:bg-red-600'} text-white px-6 py-3 rounded-lg hover:opacity-90 transition font-medium flex items-center justify-center gap-2`}
           >
-             {config.status === 'disconnected' ? 'Gerar QR Code Z-API' : 'Desconectar Instância'}
+             {config.status === 'disconnected' ? 'Conectar Integração' : 'Desconectar Instância'}
           </button>
         </div>
 
@@ -139,7 +146,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                   Credenciais Z-API
                </h3>
                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                  Configure os dados da sua instância para permitir o envio e recebimento de mensagens.
+                  Dados extraídos da sua instância. Preencha o token para finalizar.
                </p>
 
                <div className="space-y-4">
@@ -169,39 +176,45 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                      />
                   </div>
 
-                  <div>
+                  <div className="relative">
                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                        <Key size={12} /> Token da Instância
+                        <Key size={12} /> Token da Instância (Cole aqui)
                      </label>
                      <input 
                         type="password" 
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        className="w-full p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                        placeholder="Cole o token da Z-API aqui..."
+                        className="w-full p-2.5 text-sm border border-red-300 dark:border-red-800 rounded-lg bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
                      />
+                     {!apiKey && (
+                        <p className="text-[10px] text-red-500 mt-1 font-bold animate-pulse">
+                            * Obrigatório: Copie do painel da Z-API
+                        </p>
+                     )}
                   </div>
 
                   <div className="pt-2">
                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                        Webhook de Retorno
+                        Webhook de Retorno (Copie e cole na Z-API)
                      </label>
                      <div className="flex gap-2">
                         <input 
                             readOnly
                             type="text" 
                             value={webhookUrl}
-                            className="flex-1 p-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-900 text-gray-500 cursor-not-allowed"
+                            className="flex-1 p-2.5 text-sm border border-emerald-200 dark:border-emerald-800 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 font-bold"
                         />
                         <button 
                             onClick={() => copyToClipboard(webhookUrl)}
-                            className="p-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 transition"
+                            className="p-2.5 bg-emerald-100 dark:bg-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-700 rounded-lg text-emerald-700 dark:text-emerald-100 transition shadow-sm"
                             title="Copiar URL do Webhook"
                         >
                             <Copy size={18} />
                         </button>
                      </div>
                      <p className="text-[10px] text-gray-400 mt-1">
-                        Configure este endpoint no painel da Z-API para receber mensagens.
+                        Este é o link correto para o seu sistema. Configure no campo "Webhook de Retorno" na Z-API.
                      </p>
                   </div>
                </div>
@@ -272,7 +285,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                 <div className="mt-8 space-y-2 opacity-90 overflow-y-auto custom-scrollbar flex-1">
                    {isSimulating ? (
                        <>
-                           <p><span className="text-green-400">POST</span> /api/webhook/whatsapp</p>
+                           <p><span className="text-green-400">POST</span> {webhookUrl}</p>
                            <p className="text-blue-300">{`{ "event": "messages.upsert", ... }`}</p>
                            <p className="text-yellow-300 animate-pulse">Processing by Gemini AI...</p>
                        </>
