@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GoogleGenAI } from "npm:@google/genai";
-import process from "node:process";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,11 +13,21 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Configuração de Ambiente (Deno Native)
+    // Fix: Cast Deno to any to avoid TypeScript errors when Deno types are not fully loaded in the editor context
+    const supabaseUrl = (Deno as any).env.get('SUPABASE_URL') ?? '';
+    const supabaseKey = (Deno as any).env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const geminiKey = (Deno as any).env.get('GEMINI_API_KEY');
+
+    if (!supabaseUrl || !supabaseKey) {
+        throw new Error("Missing Supabase credentials in Edge Function Secrets");
+    }
+    if (!geminiKey) {
+        throw new Error("GEMINI_API_KEY is not set in Edge Function Secrets");
+    }
+
     // Initialize Supabase Client
-    const supabaseClient = createClient(
-      process.env.SUPABASE_URL ?? '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
-    );
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
     console.log("Webhook Payload:", JSON.stringify(body));
@@ -26,6 +35,7 @@ serve(async (req) => {
     let text = "";
     const messageData = body;
 
+    // Ignorar mensagens enviadas por mim mesmo (Loop prevention)
     if (messageData.fromMe) {
        return new Response(JSON.stringify({ message: "Ignored (from me)" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -33,6 +43,7 @@ serve(async (req) => {
       });
     }
 
+    // Estratégia de extração de texto (Z-API e similares)
     if (messageData.text && messageData.text.message) {
         text = messageData.text.message; 
     } else if (typeof messageData.text === 'string') {
@@ -50,12 +61,7 @@ serve(async (req) => {
       });
     }
 
-    // Initialize Gemini AI with new SDK
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    if (!geminiKey) {
-        throw new Error("GEMINI_API_KEY is not set");
-    }
-    
+    // Initialize Gemini AI
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
     const { data: categoriesData } = await supabaseClient.from('categories').select('name').limit(20);
@@ -76,7 +82,6 @@ serve(async (req) => {
       { "isTransaction": boolean, "description": string, "amount": number, "type": "income"|"expense", "category": "string" }
     `;
 
-    // Use Gemini 3 Flash Preview as per guidelines for basic text tasks
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
@@ -96,6 +101,7 @@ serve(async (req) => {
     }
 
     if (analysis.isTransaction) {
+        // Busca organização. Em produção, buscar via telefone do usuário na tabela profiles.
         const { data: orgs } = await supabaseClient.from('organizations').select('id').limit(1);
         const orgId = orgs?.[0]?.id;
 
