@@ -23,10 +23,10 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
   const [simulationStatus, setSimulationStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [lastResponse, setLastResponse] = useState<string | null>(null);
   
-  // Settings State - Configurado com os dados da imagem do usuário
+  // Settings State - Configurado com os dados completos (ID e Token) da Z-API
   const [gatewayUrl, setGatewayUrl] = useState('https://api.z-api.io');
   const [instanceId, setInstanceId] = useState('3ED6EA14FE1D7279996982BFEDF24C27');
-  const [apiKey, setApiKey] = useState(''); // O usuário deve colar o token aqui
+  const [apiKey, setApiKey] = useState('2C7B1F60C573E088895BB142'); // Token configurado
   
   // Webhook correto apontando para o Supabase do usuário
   const [webhookUrl, setWebhookUrl] = useState('https://aqimvhbgujedzyrpjogx.supabase.co/functions/v1/whatsapp-webhook');
@@ -60,7 +60,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
     setTimeout(() => {
         setIsSaving(false);
         // Em um app real, aqui salvaríamos no banco de dados
-        alert(`Integração salva com sucesso!\n\nAgora copie o Webhook abaixo e cole no painel da Z-API.`);
+        alert(`Integração salva com sucesso!\n\nCertifique-se de copiar o Webhook abaixo e configurar no painel da Z-API para receber as mensagens.`);
     }, 1000);
   };
 
@@ -146,7 +146,7 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
                   Credenciais Z-API
                </h3>
                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                  Dados extraídos da sua instância. Preencha o token para finalizar.
+                  Dados extraídos da sua instância. O token foi preenchido automaticamente.
                </p>
 
                <div className="space-y-4">
@@ -178,18 +178,18 @@ export const WhatsAppIntegration: React.FC<WhatsAppIntegrationProps> = ({
 
                   <div className="relative">
                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                        <Key size={12} /> Token da Instância (Cole aqui)
+                        <Key size={12} /> Token da Instância
                      </label>
                      <input 
-                        type="password" 
+                        type="text" 
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
                         placeholder="Cole o token da Z-API aqui..."
-                        className="w-full p-2.5 text-sm border border-red-300 dark:border-red-800 rounded-lg bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+                        className="w-full p-2.5 text-sm border border-emerald-300 dark:border-emerald-800 rounded-lg bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                      />
-                     {!apiKey && (
-                        <p className="text-[10px] text-red-500 mt-1 font-bold animate-pulse">
-                            * Obrigatório: Copie do painel da Z-API
+                     {apiKey && (
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-bold flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Token configurado
                         </p>
                      )}
                   </div>
