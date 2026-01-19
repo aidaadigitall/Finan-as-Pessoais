@@ -2,7 +2,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const getEnv = (key: string): string => {
-  if (typeof import.meta !== 'undefined' && import.meta.env?.[key]) return import.meta.env[key];
+  // Fix: Cast to any to allow dynamic access via string key
+  if (typeof import.meta !== 'undefined' && (import.meta.env as any)?.[key]) return (import.meta.env as any)[key];
   if (typeof process !== 'undefined' && process.env?.[key]) return process.env[key];
   return (window as any)?.[key] || '';
 };

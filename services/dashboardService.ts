@@ -1,6 +1,5 @@
 
 import { supabase } from '../lib/supabase';
-import { Transaction, BankAccount, TransactionType } from '../types';
 
 export interface DashboardMetrics {
   totalBalance: number;
