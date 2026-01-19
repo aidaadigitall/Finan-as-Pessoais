@@ -34,6 +34,28 @@ export const authService = {
     return session;
   },
 
+  // Novo método para buscar perfil completo
+  async getUserProfile(userId: string) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error) return null;
+    return data;
+  },
+
+  // Novo método para salvar perfil
+  async updateProfile(userId: string, updates: { full_name?: string; avatar_url?: string }) {
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId);
+    
+    if (error) throw error;
+  },
+
   async ensureUserResources(userId: string, email: string) {
     // 1. Verificar perfil existente
     const { data: profile } = await supabase
@@ -59,7 +81,7 @@ export const authService = {
 
     if (membership) return membership.organization_id;
 
-    // 3. Criar Organização com SLUG (Necessário para seu banco de dados)
+    // 3. Criar Organização com SLUG
     const emailPrefix = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
     const uniqueSlug = `${emailPrefix}-${Math.random().toString(36).substring(2, 7)}`;
     const orgName = `Empresa de ${email.split('@')[0]}`;
@@ -69,7 +91,7 @@ export const authService = {
       .insert({ 
         name: orgName, 
         owner_id: userId,
-        slug: uniqueSlug // ADICIONADO PARA CORRIGIR O ERRO
+        slug: uniqueSlug
       })
       .select()
       .single();
@@ -77,7 +99,6 @@ export const authService = {
     if (orgError) {
       console.error("Erro ao criar organização:", orgError);
       
-      // Fallback: Verificar se já existe uma org deste owner
       const { data: ownedOrg } = await supabase
         .from('organizations')
         .select('id')
@@ -85,7 +106,6 @@ export const authService = {
         .maybeSingle();
       
       if (ownedOrg) {
-         // Garantir que ele seja membro da org que ele já é dono
          await supabase.from('organization_members').upsert({
             organization_id: ownedOrg.id,
             user_id: userId,

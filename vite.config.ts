@@ -9,8 +9,8 @@ export default defineConfig({
     'process.env.VITE_SUPABASE_URL': JSON.stringify('https://aqimvhbgujedzyrpjogx.supabase.co'),
     'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify('sb_publishable_WizSBR-16hZBFe-gxL8NiQ_0BgYyabT'),
     
-    // Google Gemini Configuration
-    'process.env.API_KEY': JSON.stringify('AIzaSyA80FmfR_0o0Bvo1uJwN6sF3VO1RLaiaUY'),
+    // API KEYS REMOVED: User must provide them in the Settings UI
+    'process.env.API_KEY': JSON.stringify(''),
     
     // Fallbacks ensuring compatibility across the app
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://aqimvhbgujedzyrpjogx.supabase.co'),

@@ -9,7 +9,7 @@ import { settingsService } from './services/settingsService';
 import { ExecutiveDashboard } from './components/ExecutiveDashboard';
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
-import { TransferList } from './components/TransferList'; // Novo componente
+import { TransferList } from './components/TransferList'; 
 import { TransactionModal } from './components/TransactionModal';
 import { BankAccountManager } from './components/BankAccountManager';
 import { CategoryManager } from './components/CategoryManager';
@@ -20,7 +20,7 @@ import { AccountsPayable } from './components/AccountsPayable';
 import { AccountsReceivable } from './components/AccountsReceivable';
 import { ConfirmationModal, CustomAction } from './components/ConfirmationModal';
 import { Settings } from './components/Settings';
-import { NotificationToast, ToastType } from './components/NotificationToast'; // Componente de Notificação
+import { NotificationToast, ToastType } from './components/NotificationToast';
 
 import { 
   LayoutDashboard, List, Landmark, LogOut, Plus, 
@@ -56,7 +56,6 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
-  // Estado para controlar qual aba do modal deve abrir por padrão (Despesa, Receita, Transf)
   const [initialModalType, setInitialModalType] = useState<TransactionType>(TransactionType.EXPENSE);
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
@@ -75,7 +74,6 @@ const App: React.FC = () => {
 
   const [userRules, setUserRules] = useState<AIRule[]>([]);
 
-  // Estado global de notificações
   const [notification, setNotification] = useState<{ message: string, type: ToastType } | null>(null);
 
   const [confirmModal, setConfirmModal] = useState<ConfirmationState>({
@@ -106,8 +104,28 @@ const App: React.FC = () => {
       }
   };
 
-  const loadData = useCallback(async (id: string) => {
+  // Implementação correta de salvar perfil no banco
+  const handleUpdateProfile = async (newProfile: UserProfile) => {
+      setUserProfile(newProfile); // Atualiza UI imediatamente
+      if (newProfile.id) {
+          try {
+              await authService.updateProfile(newProfile.id, {
+                  full_name: newProfile.name,
+                  avatar_url: newProfile.avatarUrl
+              });
+              showNotification('Perfil atualizado!');
+          } catch (e: any) {
+              console.error("Erro ao salvar perfil:", e);
+              showNotification('Erro ao salvar perfil no banco.', 'error');
+          }
+      }
+  };
+
+  // loadData agora aceita parâmetro 'silent' para não mostrar tela de carregamento
+  const loadData = useCallback(async (id: string, silent: boolean = false) => {
     try {
+      if (!silent) setAppState('LOADING_DATA');
+
       const [t, a, c, crd, settings] = await Promise.all([
         financialService.getTransactions(id),
         financialService.getBankAccounts(id),
@@ -157,14 +175,17 @@ const App: React.FC = () => {
       return;
     }
 
+    // Carrega dados do perfil do banco, não apenas da sessão
+    const dbProfile = await authService.getUserProfile(session.user.id);
+
     setUserProfile({
         id: session.user.id,
         email: session.user.email!,
-        name: session.user.email!.split('@')[0],
+        name: dbProfile?.full_name || session.user.email!.split('@')[0],
+        avatarUrl: dbProfile?.avatar_url,
         role: 'owner'
     });
 
-    setAppState('LOADING_DATA');
     try {
       const id = await authService.ensureUserResources(session.user.id, session.user.email!);
       setOrgId(id);
@@ -177,12 +198,20 @@ const App: React.FC = () => {
 
   useEffect(() => {
     initialize();
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) initialize();
+      // SÓ reinicializa se for um login explícito.
+      // Mudança de aba (FOCUS) não deve disparar LOADING_DATA se já estiver logado.
+      if (event === 'SIGNED_IN' && session) {
+         // Verificamos se já estamos prontos para evitar loop
+         if (appState !== 'READY' && appState !== 'LOADING_DATA') {
+             initialize();
+         }
+      }
       if (event === 'SIGNED_OUT') setAppState('AUTH_REQUIRED');
     });
     return () => subscription.unsubscribe();
-  }, [initialize]);
+  }, [initialize]); // Remove appState from dependency to avoid loop
 
   // --- REALTIME SUBSCRIPTION ---
   useEffect(() => {
@@ -195,17 +224,17 @@ const App: React.FC = () => {
       .on(
         'postgres_changes',
         {
-          event: '*', // Escuta INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'transactions',
           filter: `organization_id=eq.${orgId}`
         },
         (payload) => {
           console.log('Alteração recebida via WhatsApp/Realtime:', payload);
-          // Recarrega os dados para garantir consistência total (saldo, gráficos, etc)
-          loadData(orgId).then(() => {
+          // IMPORTANTE: loadData com SILENT = TRUE para não travar a tela
+          loadData(orgId, true).then(() => {
              if (payload.eventType === 'INSERT') {
-                 showNotification('Novo lançamento recebido via WhatsApp!', 'info');
+                 showNotification('Novo lançamento sincronizado!', 'info');
              }
           });
         }
@@ -240,7 +269,7 @@ const App: React.FC = () => {
     if (!orgId) return;
     try {
       await financialService.createCreditCard(card, orgId);
-      await loadData(orgId);
+      await loadData(orgId, true);
       showNotification('Cartão criado com sucesso!');
     } catch (e: any) { alert("Erro ao criar cartão: " + e.message); }
   };
@@ -249,7 +278,7 @@ const App: React.FC = () => {
     if (!orgId) return;
     try {
       await financialService.updateCreditCard(card, orgId);
-      await loadData(orgId);
+      await loadData(orgId, true);
       showNotification('Cartão atualizado!');
     } catch (e: any) { alert("Erro ao atualizar cartão: " + e.message); }
   };
@@ -263,7 +292,7 @@ const App: React.FC = () => {
       async () => {
         try {
           await financialService.deleteCreditCard(id);
-          await loadData(orgId);
+          await loadData(orgId, true);
           showNotification('Cartão removido.', 'info');
         } catch (e: any) { alert("Erro ao excluir cartão: " + e.message); }
       },
@@ -276,7 +305,7 @@ const App: React.FC = () => {
     if (!orgId) return;
     try {
       await financialService.createBankAccount(acc, orgId);
-      await loadData(orgId);
+      await loadData(orgId, true);
       showNotification('Conta bancária criada!');
     } catch (e: any) { alert("Erro ao criar conta: " + e.message); }
   };
@@ -285,7 +314,7 @@ const App: React.FC = () => {
     if (!orgId) return;
     try {
       await financialService.updateBankAccount(acc, orgId);
-      await loadData(orgId);
+      await loadData(orgId, true);
       showNotification('Conta atualizada.');
     } catch (e: any) { alert("Erro ao atualizar conta: " + e.message); }
   };
@@ -299,7 +328,7 @@ const App: React.FC = () => {
       async () => {
         try {
           await financialService.deleteBankAccount(id);
-          await loadData(orgId);
+          await loadData(orgId, true);
           showNotification('Conta excluída.', 'info');
         } catch (e: any) { alert("Erro ao excluir conta: " + e.message); }
       },
@@ -318,7 +347,7 @@ const App: React.FC = () => {
          await financialService.createTransaction(t, orgId);
          showNotification('Lançamento salvo com sucesso!');
       }
-      await loadData(orgId);
+      await loadData(orgId, true);
       setTransactionToEdit(null);
     } catch (e: any) { 
         showNotification("Erro ao salvar: " + e.message, 'error'); 
@@ -346,7 +375,7 @@ const App: React.FC = () => {
                       onClick: async () => {
                           try {
                               await financialService.deleteTransaction(id);
-                              await loadData(orgId);
+                              await loadData(orgId, true);
                               showNotification('Parcela excluída.');
                           } catch (e: any) { alert("Erro: " + e.message); }
                       }
@@ -358,7 +387,7 @@ const App: React.FC = () => {
                       onClick: async () => {
                           try {
                               await financialService.deleteInstallmentSeries(transaction.installmentId!);
-                              await loadData(orgId);
+                              await loadData(orgId, true);
                               showNotification('Série parcelada excluída.');
                           } catch (e: any) { alert("Erro: " + e.message); }
                       }
@@ -374,7 +403,7 @@ const App: React.FC = () => {
           async () => {
               try {
                   await financialService.deleteTransaction(id);
-                  await loadData(orgId);
+                  await loadData(orgId, true);
                   showNotification('Lançamento removido.', 'info');
               } catch (e: any) { alert("Erro ao excluir lançamento: " + e.message); }
           },
@@ -406,7 +435,7 @@ const App: React.FC = () => {
     if (!orgId) return;
     try {
       await financialService.createCategory(cat, orgId);
-      await loadData(orgId);
+      await loadData(orgId, true);
       showNotification('Categoria criada!');
     } catch (e: any) { alert("Erro ao criar categoria: " + e.message); }
   };
@@ -495,7 +524,7 @@ const App: React.FC = () => {
           <NavItem icon={Briefcase} label="Cockpit Executivo" view="executive" />
           <NavItem icon={LayoutDashboard} label="Dashboard" view="dashboard" />
           <NavItem icon={List} label="Movimentações" view="transactions" />
-          <NavItem icon={ArrowRightLeft} label="Transferências" view="transfers" /> {/* Nova Aba */}
+          <NavItem icon={ArrowRightLeft} label="Transferências" view="transfers" />
           
           <div className="pt-4 pb-2 text-xs font-bold text-gray-400 uppercase tracking-widest pl-4">Operacional</div>
           <NavItem icon={TrendingDown} label="Contas a Pagar" view="payable" />
@@ -564,7 +593,7 @@ const App: React.FC = () => {
                 settings={systemSettings} 
                 onUpdateSettings={handleUpdateSettings} 
                 userProfile={userProfile}
-                onUpdateProfile={setUserProfile}
+                onUpdateProfile={handleUpdateProfile}
                 userRules={userRules}
                 onUpdateRules={handleUpdateRules}
                 categories={categories}
@@ -581,7 +610,7 @@ const App: React.FC = () => {
          accounts={accounts} 
          cards={cards}
          transactionToEdit={transactionToEdit}
-         initialType={initialModalType} // Passa o tipo inicial
+         initialType={initialModalType} 
       />
 
       <ConfirmationModal
